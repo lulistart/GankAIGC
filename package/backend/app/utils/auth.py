@@ -41,9 +41,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-def create_user_access_token(user_id: int, username: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_user_access_token(
+    user_id: int,
+    username: str,
+    expires_delta: Optional[timedelta] = None,
+    token_version: int = 0,
+) -> str:
     return create_access_token(
-        {"sub": str(user_id), "username": username, "role": "user"},
+        {"sub": str(user_id), "username": username, "role": "user", "token_version": token_version},
         expires_delta=expires_delta,
     )
 
@@ -80,6 +85,8 @@ def get_current_user_from_bearer(
     user = db.query(User).filter(User.id == int(user_id), User.is_active.is_(True)).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在或已禁用")
+    if int(payload.get("token_version", 0)) != int(user.token_version or 0):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录状态已失效，请重新登录")
 
     user.last_used = utcnow()
     db.commit()
@@ -101,6 +108,8 @@ def get_current_user_with_legacy_fallback(
             if user_id and str(user_id).isdigit():
                 user = db.query(User).filter(User.id == int(user_id), User.is_active.is_(True)).first()
                 if user:
+                    if int(payload.get("token_version", 0)) != int(user.token_version or 0):
+                        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录状态已失效，请重新登录")
                     user.last_used = utcnow()
                     db.commit()
                     return user

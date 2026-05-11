@@ -369,6 +369,49 @@ def test_user_can_change_own_password_and_login_with_new_password(client):
     assert new_login.json()["access_token"]
 
 
+def test_user_password_change_invalidates_existing_token(client):
+    from app.database import SessionLocal
+    from app.models.models import User
+    from app.utils.auth import create_user_access_token, get_password_hash
+
+    db = SessionLocal()
+    try:
+        user = User(
+            username="alice",
+            password_hash=get_password_hash("Password123!"),
+            access_link="http://testserver/access/alice",
+            is_active=True,
+            credit_balance=0,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        old_token = create_user_access_token(user.id, user.username, token_version=user.token_version or 0)
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/auth/me/password",
+        json={"current_password": "Password123!", "new_password": "NewPassword456!"},
+        headers={"Authorization": f"Bearer {old_token}"},
+    )
+    assert response.status_code == 200
+
+    old_me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {old_token}"})
+    assert old_me.status_code == 401
+    assert old_me.json()["detail"] == "登录状态已失效，请重新登录"
+
+    new_login = client.post(
+        "/api/auth/login",
+        json={"username": "alice", "password": "NewPassword456!"},
+    )
+    assert new_login.status_code == 200
+    new_token = new_login.json()["access_token"]
+
+    new_me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {new_token}"})
+    assert new_me.status_code == 200
+
+
 def test_user_change_password_requires_current_password(client):
     from app.database import SessionLocal
     from app.models.models import User

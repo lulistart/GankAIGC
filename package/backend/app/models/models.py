@@ -22,6 +22,7 @@ class User(Base):
     last_login_at = Column(DateTime, nullable=True)
     usage_limit = Column(Integer, default=settings.DEFAULT_USAGE_LIMIT)
     usage_count = Column(Integer, default=0)
+    token_version = Column(Integer, default=0)
     
     # 关系
     sessions = relationship("OptimizationSession", back_populates="user")

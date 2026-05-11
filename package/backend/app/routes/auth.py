@@ -44,6 +44,8 @@ def get_current_user_from_bearer(
     user = db.query(User).filter(User.id == int(user_id), User.is_active.is_(True)).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在或已禁用")
+    if int(payload.get("token_version", 0)) != int(user.token_version or 0):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录状态已失效，请重新登录")
     return user
 
 
@@ -103,8 +105,10 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账号已被封禁，请联系管理员")
 
     user.last_login_at = utcnow()
+    if user.token_version is None:
+        user.token_version = 0
     db.commit()
-    token = create_user_access_token(user.id, user.username or "")
+    token = create_user_access_token(user.id, user.username or "", token_version=user.token_version or 0)
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -145,5 +149,6 @@ async def update_my_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="新密码不能和当前密码相同")
 
     current_user.password_hash = get_password_hash(payload.new_password)
+    current_user.token_version = int(current_user.token_version or 0) + 1
     db.commit()
     return {"message": "密码已更新"}

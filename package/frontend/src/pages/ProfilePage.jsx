@@ -117,7 +117,11 @@ const ProfilePage = () => {
         newPassword: '',
         confirmPassword: '',
       });
-      toast.success('密码已更新');
+      localStorage.removeItem('userToken');
+      toast.success('密码已更新，请重新登录');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 600);
     } catch (error) {
       toast.error(error.response?.data?.detail || '修改密码失败');
     } finally {

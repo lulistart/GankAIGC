@@ -300,6 +300,10 @@ def _migrate_database_schema():
                     if _add_column_safely(conn, "users", "usage_count", "INTEGER DEFAULT 0"):
                         print("  ✓ 添加字段: users.usage_count")
 
+                if "token_version" not in user_columns:
+                    if _add_column_safely(conn, "users", "token_version", "INTEGER DEFAULT 0"):
+                        print("  ✓ 添加字段: users.token_version")
+
                 try:
                     conn.execute(text("UPDATE users SET is_unlimited = false WHERE is_unlimited IS NULL"))
                     conn.execute(text("UPDATE users SET credit_balance = 0 WHERE credit_balance IS NULL"))
@@ -310,6 +314,7 @@ def _migrate_database_schema():
                         )
                     )
                     conn.execute(text("UPDATE users SET usage_count = 0 WHERE usage_count IS NULL"))
+                    conn.execute(text("UPDATE users SET token_version = 0 WHERE token_version IS NULL"))
                     conn.commit()
                 except Exception:
                     conn.rollback()

@@ -11,6 +11,8 @@ RUN npm run build
 
 FROM ${DOCKER_IMAGE_PREFIX}library/python:3.11-slim AS app
 
+ARG DOCKER_COMPOSE_VERSION
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
@@ -18,7 +20,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app/package
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git docker.io \
+    && apt-get install -y --no-install-recommends ca-certificates curl git docker-cli \
     && mkdir -p /app/config /usr/local/lib/docker/cli-plugins \
     && arch="$(uname -m)" \
     && case "$arch" in \

@@ -33,6 +33,10 @@ const ADMIN_ACCOUNT_FORM_CLASS = 'grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_5
 const ADMIN_ACCOUNT_INPUT_CLASS = 'w-full min-w-0 h-12 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent';
 const ADMIN_ACCOUNT_WIDE_INPUT_CLASS = `${ADMIN_ACCOUNT_INPUT_CLASS} sm:col-span-2`;
 const ADMIN_ACCOUNT_ACTION_BUTTON_CLASS = 'min-w-[7rem] h-12 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold';
+const ADMIN_COMPACT_TABLE_SCROLL_CLASS = 'overflow-auto max-h-[26rem]';
+const ADMIN_TABLE_SCROLL_CLASS = 'overflow-auto max-h-[49rem]';
+const ADMIN_COMPACT_TABLE_HEAD_CLASS = 'sticky top-0 z-10 bg-white';
+const ADMIN_TABLE_HEAD_CLASS = 'sticky top-0 z-10 bg-gray-50';
 
 const formatAdminNumber = (value) => Number(value || 0).toLocaleString();
 
@@ -785,9 +789,9 @@ const AdminDashboard = () => {
                   </button>
                 </form>
 
-                <div className="overflow-x-auto">
+                <div className={ADMIN_COMPACT_TABLE_SCROLL_CLASS}>
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
+                    <thead className={ADMIN_COMPACT_TABLE_HEAD_CLASS}>
                       <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <th className="py-3 pr-4">邀请码</th>
                         <th className="py-3 pr-4">状态</th>
@@ -869,9 +873,9 @@ const AdminDashboard = () => {
                   </button>
                 </form>
 
-                <div className="overflow-x-auto">
+                <div className={ADMIN_COMPACT_TABLE_SCROLL_CLASS}>
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
+                    <thead className={ADMIN_COMPACT_TABLE_HEAD_CLASS}>
                       <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <th className="py-3 pr-4">兑换码</th>
                         <th className="py-3 pr-4">啤酒</th>
@@ -924,9 +928,9 @@ const AdminDashboard = () => {
                 </div>
                 {loadingAccountData && <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />}
               </div>
-              <div className="overflow-x-auto">
+              <div className={ADMIN_TABLE_SCROLL_CLASS}>
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className={ADMIN_TABLE_HEAD_CLASS}>
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
@@ -1017,9 +1021,9 @@ const AdminDashboard = () => {
                   <p className="text-xs text-gray-500 mt-1">展示充值、兑换、降 AI 消耗和失败退款，方便排查用户余额变化</p>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className={ADMIN_TABLE_SCROLL_CLASS}>
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className={ADMIN_TABLE_HEAD_CLASS}>
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
@@ -1072,9 +1076,9 @@ const AdminDashboard = () => {
                 <h3 className="text-lg font-semibold text-gray-900">用户自带 API 配置摘要</h3>
                 <p className="text-xs text-gray-500 mt-1">仅显示 base_url、模型名和 API Key 后四位，不展示完整密钥</p>
               </div>
-              <div className="overflow-x-auto">
+              <div className={ADMIN_TABLE_SCROLL_CLASS}>
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className={ADMIN_TABLE_HEAD_CLASS}>
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base URL</th>

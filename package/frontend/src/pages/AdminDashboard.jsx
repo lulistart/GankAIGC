@@ -760,7 +760,7 @@ const AdminDashboard = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="space-y-6">
               <div className="bg-white rounded-2xl shadow-ios p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">

@@ -49,7 +49,7 @@ def test_admin_update_status_reports_vps_prerequisites(client, monkeypatch):
     assert data["release_update_available"] is True
     assert data["vps_update_enabled"] is False
     assert data["can_run_update"] is False
-    assert "docker-compose.update.yml" in data["setup_command"]
+    assert "--profile update" in data["setup_command"]
 
 
 def test_admin_update_run_rejects_when_vps_update_disabled(client, monkeypatch):
@@ -72,7 +72,7 @@ def test_admin_update_run_starts_updater_and_writes_audit_log(client, monkeypatc
         return {
             "started": True,
             "message": "VPS 更新任务已启动",
-            "command": "docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.update.yml --profile update up --build -d updater",
+            "command": "docker compose --env-file .env.docker --profile update up --build -d updater",
         }
 
     monkeypatch.setattr(update_service, "start_vps_update", fake_start_vps_update)

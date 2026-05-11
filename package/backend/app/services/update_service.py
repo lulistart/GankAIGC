@@ -98,16 +98,13 @@ def get_git_revision_status() -> Dict[str, Any]:
 
 def _update_enabled_message() -> str:
     return (
-        "复制 docker-compose.update.example.yml 为 docker-compose.update.yml，"
-        "确认挂载宿主机 Docker socket 和项目目录后，在 .env.docker 设置 VPS_UPDATE_ENABLED=true。"
+        "请使用最新 docker-compose.yml 重建 app 容器，确认 /app/source 和 "
+        "/var/run/docker.sock 已挂载，并在 .env.docker 设置 VPS_UPDATE_ENABLED=true。"
     )
 
 
 def get_vps_update_command() -> str:
-    return (
-        "docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.update.yml "
-        "--profile update up --build -d updater"
-    )
+    return "docker compose --env-file .env.docker --profile update up --build -d updater"
 
 
 def can_run_vps_update() -> Tuple[bool, Optional[str]]:

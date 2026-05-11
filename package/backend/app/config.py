@@ -129,12 +129,11 @@ class Settings(BaseSettings):
     TASK_WORKER_POLL_INTERVAL: float = 2.0
     TASK_WORKER_HEARTBEAT_INTERVAL: float = 30.0
     TASK_WORKER_STALE_TIMEOUT_SECONDS: int = 1800
-    VPS_UPDATE_ENABLED: bool = False
+    VPS_UPDATE_ENABLED: bool = True
     VPS_UPDATE_WORKDIR: str = "/app/source"
     VPS_UPDATE_LOG_FILE: str = "/app/source/logs/vps-update.log"
     VPS_UPDATE_COMMAND: str = (
-        "(docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.update.yml "
-        "--profile update up --build -d updater)"
+        "docker compose --env-file .env.docker --profile update up --build -d updater"
     )
 
     model_config = SettingsConfigDict(

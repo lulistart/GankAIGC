@@ -5,7 +5,7 @@ import sys
 
 DEFAULT_SECRET_KEY = "your-secret-key-change-this-in-production"
 DEFAULT_ADMIN_PASSWORD = "admin123"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 SERVER_DEPLOYMENT_ENVS = {"production", "staging", "server"}
 PLACEHOLDER_SECRET_VALUES = {
     "",

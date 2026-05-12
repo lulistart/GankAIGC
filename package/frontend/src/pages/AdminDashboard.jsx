@@ -25,6 +25,7 @@ import {
   Download,
   Megaphone,
   Save,
+  Trash2,
   X,
   UploadCloud
 } from 'lucide-react';
@@ -103,6 +104,23 @@ const getAdminTabFromSearchParams = (searchParams) => {
   return ADMIN_TAB_IDS.includes(requestedTab) ? requestedTab : DEFAULT_ADMIN_TAB;
 };
 
+const createTextDownload = (content, filename, type = 'text/plain;charset=utf-8') => {
+  const blob = content instanceof Blob ? content : new Blob([content], { type });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+const escapeCsvCell = (value) => {
+  const text = String(value ?? '');
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -137,8 +155,12 @@ const AdminDashboard = () => {
   const [newInviteCode, setNewInviteCode] = useState('');
   const [newCreditCode, setNewCreditCode] = useState('');
   const [newCreditAmount, setNewCreditAmount] = useState(10);
+  const [inviteBatchQuantity, setInviteBatchQuantity] = useState(10);
   const [creditBatchQuantity, setCreditBatchQuantity] = useState(10);
+  const [creatingInviteBatch, setCreatingInviteBatch] = useState(false);
   const [creatingCreditBatch, setCreatingCreditBatch] = useState(false);
+  const [selectedInviteIds, setSelectedInviteIds] = useState([]);
+  const [selectedCreditCodeIds, setSelectedCreditCodeIds] = useState([]);
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementContent, setAnnouncementContent] = useState('');
   const [announcementCategory, setAnnouncementCategory] = useState('notice');
@@ -317,6 +339,8 @@ const AdminDashboard = () => {
       setUsers(usersResponse.data);
       setInvites(invitesResponse.data);
       setCreditCodes(creditCodesResponse.data);
+      setSelectedInviteIds((current) => current.filter((id) => invitesResponse.data.some((invite) => invite.id === id)));
+      setSelectedCreditCodeIds((current) => current.filter((id) => creditCodesResponse.data.some((code) => code.id === id)));
 
       const [creditTransactionsResult, providerConfigsResult] = await Promise.allSettled([
         axios.get('/api/admin/credit-transactions', { headers, params: { limit: 30 } }),
@@ -402,6 +426,22 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleBatchCreateInvites = async () => {
+    setCreatingInviteBatch(true);
+    try {
+      const response = await axios.post('/api/admin/invites/batch',
+        { quantity: inviteBatchQuantity },
+        { headers: { Authorization: `Bearer ${adminToken}` } }
+      );
+      toast.success(`已批量生成 ${response.data.length} 个邀请码`);
+      fetchAccountData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || '批量生成邀请码失败');
+    } finally {
+      setCreatingInviteBatch(false);
+    }
+  };
+
   const handleCreateCreditCode = async (e) => {
     e.preventDefault();
     const amount = parseInt(newCreditAmount, 10);
@@ -446,32 +486,126 @@ const AdminDashboard = () => {
     }
   };
 
-  const copyAllCreditCodes = () => {
-    if (creditCodes.length === 0) {
-      toast.error('暂无可复制的兑换码');
-      return;
-    }
-    copyToClipboard(creditCodes.map((code) => code.code).join('\n'));
+  const selectedInvites = invites.filter((invite) => selectedInviteIds.includes(invite.id));
+  const selectedCreditCodes = creditCodes.filter((code) => selectedCreditCodeIds.includes(code.id));
+
+  const toggleInviteSelection = (inviteId) => {
+    setSelectedInviteIds((current) => (
+      current.includes(inviteId)
+        ? current.filter((id) => id !== inviteId)
+        : [...current, inviteId]
+    ));
   };
 
-  const downloadCreditCodes = async (format) => {
+  const toggleCreditCodeSelection = (codeId) => {
+    setSelectedCreditCodeIds((current) => (
+      current.includes(codeId)
+        ? current.filter((id) => id !== codeId)
+        : [...current, codeId]
+    ));
+  };
+
+  const toggleAllInviteSelection = () => {
+    setSelectedInviteIds((current) => (
+      invites.length > 0 && current.length === invites.length ? [] : invites.map((invite) => invite.id)
+    ));
+  };
+
+  const toggleAllCreditCodeSelection = () => {
+    setSelectedCreditCodeIds((current) => (
+      creditCodes.length > 0 && current.length === creditCodes.length ? [] : creditCodes.map((code) => code.id)
+    ));
+  };
+
+  const copyInviteCodes = (onlySelected = false) => {
+    const rows = onlySelected ? selectedInvites : invites;
+    if (rows.length === 0) {
+      toast.error(onlySelected ? '请先选择邀请码' : '暂无可复制的邀请码');
+      return;
+    }
+    copyToClipboard(rows.map((invite) => invite.code).join('\n'));
+  };
+
+  const copyCreditCodes = (onlySelected = false) => {
+    const rows = onlySelected ? selectedCreditCodes : creditCodes;
+    if (rows.length === 0) {
+      toast.error(onlySelected ? '请先选择兑换码' : '暂无可复制的兑换码');
+      return;
+    }
+    copyToClipboard(rows.map((code) => code.code).join('\n'));
+  };
+
+  const downloadRows = (rows, format, filenameBase, headers, toRow) => {
+    if (rows.length === 0) {
+      toast.error('请先选择要导出的记录');
+      return;
+    }
+    if (format === 'txt') {
+      createTextDownload(`${rows.map((row) => row.code).join('\n')}\n`, `${filenameBase}.txt`);
+      return;
+    }
+    const content = [
+      headers.join(','),
+      ...rows.map((row) => toRow(row).map(escapeCsvCell).join(',')),
+    ].join('\n') + '\n';
+    createTextDownload(content, `${filenameBase}.csv`, 'text/csv;charset=utf-8');
+  };
+
+  const downloadInvites = async (format, onlySelected = false) => {
+    if (onlySelected) {
+      downloadRows(
+        selectedInvites,
+        format,
+        'gankaigc-selected-invites',
+        ['code', 'is_active', 'created_by_type', 'used_by_user_id', 'created_at'],
+        (invite) => [
+          invite.code,
+          invite.is_active,
+          invite.created_by_type || 'admin',
+          invite.used_by_user_id || '',
+          invite.created_at || '',
+        ],
+      );
+      return;
+    }
+
+    try {
+      const response = await axios.get('/api/admin/invites/export', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+        params: { format },
+        responseType: 'blob',
+      });
+      createTextDownload(response.data, `gankaigc-registration-invites.${format}`, format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || '导出邀请码失败');
+    }
+  };
+
+  const downloadCreditCodes = async (format, onlySelected = false) => {
+    if (onlySelected) {
+      downloadRows(
+        selectedCreditCodes,
+        format,
+        'gankaigc-selected-credit-codes',
+        ['code', 'credit_amount', 'is_active', 'redeemed_by_user_id', 'created_at'],
+        (code) => [
+          code.code,
+          code.credit_amount,
+          code.is_active,
+          code.redeemed_by_user_id || '',
+          code.created_at || '',
+        ],
+      );
+      return;
+    }
+
     try {
       const response = await axios.get('/api/admin/credit-codes/export', {
         headers: { Authorization: `Bearer ${adminToken}` },
         params: { format },
         responseType: 'blob',
       });
-      const blob = new Blob([response.data], {
-        type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `gankaigc-credit-codes.${format}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      createTextDownload(response.data, `gankaigc-credit-codes.${format}`, format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8');
     } catch (error) {
       toast.error(error.response?.data?.detail || '导出兑换码失败');
     }
@@ -515,6 +649,23 @@ const AdminDashboard = () => {
       fetchAnnouncements();
     } catch (error) {
       toast.error(error.response?.data?.detail || '更新公告失败');
+    }
+  };
+
+  const handleDeleteAnnouncement = async (announcement) => {
+    const confirmed = window.confirm(`确认删除公告「${announcement.title}」吗？删除后用户工作台不会再显示。`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await axios.delete(`/api/admin/announcements/${announcement.id}`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      toast.success('公告已删除');
+      fetchAnnouncements();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || '删除公告失败');
     }
   };
 
@@ -1005,10 +1156,74 @@ const AdminDashboard = () => {
                   </button>
                 </form>
 
+                <div className="mb-5 flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-800">批量生成</span>
+                    {[10, 50, 100].map((quantity) => (
+                      <button
+                        key={quantity}
+                        type="button"
+                        onClick={() => setInviteBatchQuantity(quantity)}
+                        className={`h-9 rounded-lg px-3 text-sm font-semibold transition-colors ${
+                          inviteBatchQuantity === quantity
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-blue-700 hover:bg-blue-100'
+                        }`}
+                      >
+                        {quantity}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleBatchCreateInvites}
+                      disabled={creatingInviteBatch}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-gray-300"
+                    >
+                      {creatingInviteBatch ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      生成
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyInviteCodes(selectedInviteIds.length > 0)}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      <Copy className="h-4 w-4" />
+                      {selectedInviteIds.length > 0 ? `复制选中 ${selectedInviteIds.length}` : '复制全部'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadInvites('csv', selectedInviteIds.length > 0)}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      <Download className="h-4 w-4" />
+                      CSV
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadInvites('txt', selectedInviteIds.length > 0)}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      <Download className="h-4 w-4" />
+                      TXT
+                    </button>
+                  </div>
+                </div>
+
                 <div className={ADMIN_COMPACT_TABLE_SCROLL_CLASS}>
                   <table className="min-w-[46rem] divide-y divide-gray-200">
                     <thead className={ADMIN_COMPACT_TABLE_HEAD_CLASS}>
                       <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="py-3 pr-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={invites.length > 0 && selectedInviteIds.length === invites.length}
+                            onChange={toggleAllInviteSelection}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            title="全选邀请码"
+                          />
+                        </th>
                         <th className="py-3 pr-4 whitespace-nowrap">邀请码</th>
                         <th className="py-3 pr-4 whitespace-nowrap">状态</th>
                         <th className="py-3 pr-4 whitespace-nowrap">来源</th>
@@ -1019,10 +1234,19 @@ const AdminDashboard = () => {
                     <tbody className="divide-y divide-gray-100">
                       {invites.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="py-8 text-center text-sm text-gray-500">暂无邀请码</td>
+                          <td colSpan="6" className="py-8 text-center text-sm text-gray-500">暂无邀请码</td>
                         </tr>
                       ) : invites.map((invite) => (
                         <tr key={invite.id}>
+                          <td className="py-3 pr-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={selectedInviteIds.includes(invite.id)}
+                              onChange={() => toggleInviteSelection(invite.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              title="选择邀请码"
+                            />
+                          </td>
                           <td className="py-3 pr-4 whitespace-nowrap">
                             <button
                               onClick={() => copyToClipboard(invite.code)}
@@ -1143,15 +1367,15 @@ const AdminDashboard = () => {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={copyAllCreditCodes}
+                      onClick={() => copyCreditCodes(selectedCreditCodeIds.length > 0)}
                       className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                     >
                       <Copy className="h-4 w-4" />
-                      复制全部
+                      {selectedCreditCodeIds.length > 0 ? `复制选中 ${selectedCreditCodeIds.length}` : '复制全部'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => downloadCreditCodes('csv')}
+                      onClick={() => downloadCreditCodes('csv', selectedCreditCodeIds.length > 0)}
                       className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                     >
                       <Download className="h-4 w-4" />
@@ -1159,7 +1383,7 @@ const AdminDashboard = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => downloadCreditCodes('txt')}
+                      onClick={() => downloadCreditCodes('txt', selectedCreditCodeIds.length > 0)}
                       className="inline-flex h-9 items-center gap-2 rounded-lg bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                     >
                       <Download className="h-4 w-4" />
@@ -1172,6 +1396,15 @@ const AdminDashboard = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className={ADMIN_COMPACT_TABLE_HEAD_CLASS}>
                       <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="py-3 pr-4">
+                          <input
+                            type="checkbox"
+                            checked={creditCodes.length > 0 && selectedCreditCodeIds.length === creditCodes.length}
+                            onChange={toggleAllCreditCodeSelection}
+                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            title="全选兑换码"
+                          />
+                        </th>
                         <th className="py-3 pr-4">兑换码</th>
                         <th className="py-3 pr-4">啤酒</th>
                         <th className="py-3 pr-4">状态</th>
@@ -1181,10 +1414,19 @@ const AdminDashboard = () => {
                     <tbody className="divide-y divide-gray-100">
                       {creditCodes.length === 0 ? (
                         <tr>
-                          <td colSpan="4" className="py-8 text-center text-sm text-gray-500">暂无兑换码</td>
+                          <td colSpan="5" className="py-8 text-center text-sm text-gray-500">暂无兑换码</td>
                         </tr>
                       ) : creditCodes.map((code) => (
                         <tr key={code.id}>
+                          <td className="py-3 pr-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedCreditCodeIds.includes(code.id)}
+                              onChange={() => toggleCreditCodeSelection(code.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                              title="选择兑换码"
+                            />
+                          </td>
                           <td className="py-3 pr-4">
                             <button
                               onClick={() => copyToClipboard(code.code)}
@@ -1531,12 +1773,21 @@ const AdminDashboard = () => {
                                 {formatChinaDateTime(announcement.created_at)}
                               </p>
                             </div>
-                            <button
-                              onClick={() => handleToggleAnnouncement(announcement)}
-                              className="shrink-0 rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-200"
-                            >
-                              {announcement.is_active ? '隐藏' : '启用'}
-                            </button>
+                            <div className="flex shrink-0 gap-2">
+                              <button
+                                onClick={() => handleToggleAnnouncement(announcement)}
+                                className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-200"
+                              >
+                                {announcement.is_active ? '隐藏' : '启用'}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteAnnouncement(announcement)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                删除
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}

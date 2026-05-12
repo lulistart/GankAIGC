@@ -507,6 +507,48 @@ def test_admin_can_create_list_and_toggle_registration_invites(client):
     assert toggle_response.json()["is_active"] is False
 
 
+def test_admin_can_batch_create_and_export_registration_invites(client):
+    headers = _admin_auth_headers(client)
+
+    batch_response = client.post(
+        "/api/admin/invites/batch",
+        json={"quantity": 10},
+        headers=headers,
+    )
+
+    assert batch_response.status_code == 200
+    payload = batch_response.json()
+    assert len(payload) == 10
+    assert len({item["code"] for item in payload}) == 10
+    assert all(item["is_active"] for item in payload)
+    assert all(item["created_by_type"] == "admin" for item in payload)
+
+    csv_response = client.get("/api/admin/invites/export?format=csv", headers=headers)
+    txt_response = client.get("/api/admin/invites/export?format=txt", headers=headers)
+
+    assert csv_response.status_code == 200
+    assert "text/csv" in csv_response.headers["content-type"]
+    assert "code,is_active,created_by_type,used_by_user_id,created_at" in csv_response.text
+    assert payload[0]["code"] in csv_response.text
+
+    assert txt_response.status_code == 200
+    assert "text/plain" in txt_response.headers["content-type"]
+    assert set(txt_response.text.strip().splitlines()) == {item["code"] for item in payload}
+
+
+def test_admin_batch_registration_invites_rejects_unsupported_quantity(client):
+    headers = _admin_auth_headers(client)
+
+    response = client.post(
+        "/api/admin/invites/batch",
+        json={"quantity": 7},
+        headers=headers,
+    )
+
+    assert response.status_code in {400, 422}
+    assert "10" in str(response.json())
+
+
 def test_admin_invite_list_includes_creator_and_used_user_identity(client):
     from app.database import SessionLocal
     from app.models.models import RegistrationInvite, User

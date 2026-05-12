@@ -110,3 +110,26 @@ def test_admin_can_disable_announcement_so_users_no_longer_see_it(client):
     assert patch_response.json()["is_active"] is False
     assert user_response.status_code == 200
     assert user_response.json() == []
+
+
+def test_admin_can_delete_announcement(client):
+    admin_headers = _admin_auth_headers(client)
+    user_id = _create_user()
+    user_headers = _user_auth_headers(user_id)
+    create_response = client.post(
+        "/api/admin/announcements",
+        json={"title": "临时公告", "content": "很快删除", "category": "notice", "is_active": True},
+        headers=admin_headers,
+    )
+    announcement_id = create_response.json()["id"]
+
+    delete_response = client.delete(f"/api/admin/announcements/{announcement_id}", headers=admin_headers)
+    admin_list_response = client.get("/api/admin/announcements", headers=admin_headers)
+    user_response = client.get("/api/user/announcements", headers=user_headers)
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["message"] == "公告已删除"
+    assert admin_list_response.status_code == 200
+    assert admin_list_response.json() == []
+    assert user_response.status_code == 200
+    assert user_response.json() == []

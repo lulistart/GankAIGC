@@ -38,6 +38,7 @@ from app.schemas import (
     CreditCodeCreateRequest,
     CreditCodeResponse,
     DatabaseUpdateRequest,
+    InviteBatchCreateRequest,
     InviteCreateRequest,
     UserResponse,
     UserUsageUpdate,
@@ -247,6 +248,18 @@ def _generate_unique_credit_code(db: Session, reserved_codes: Optional[set[str]]
     raise HTTPException(status_code=500, detail="兑换码生成失败，请重试")
 
 
+def _generate_unique_invite_code(db: Session, reserved_codes: Optional[set[str]] = None) -> str:
+    reserved_codes = reserved_codes or set()
+    for _ in range(20):
+        code = secrets.token_urlsafe(18)
+        if code in reserved_codes:
+            continue
+        existing_invite = db.query(RegistrationInvite).filter(RegistrationInvite.code == code).first()
+        if not existing_invite:
+            return code
+    raise HTTPException(status_code=500, detail="邀请码生成失败，请重试")
+
+
 def _model_to_dict(record: Any) -> Dict[str, Any]:
     data: Dict[str, Any] = {}
     mapper = inspect(record).mapper
@@ -416,7 +429,7 @@ async def create_registration_invite(
     admin_username: str = Depends(get_admin_from_token),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    code = payload.code or secrets.token_urlsafe(18)
+    code = payload.code or _generate_unique_invite_code(db)
     existing_invite = db.query(RegistrationInvite).filter(RegistrationInvite.code == code).first()
     if existing_invite:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="邀请码已存在")
@@ -440,6 +453,88 @@ async def create_registration_invite(
         .one()
     )
     return serialize_registration_invite(invite)
+
+
+@router.post("/invites/batch", response_model=List[InviteResponse])
+async def batch_create_registration_invites(
+    payload: InviteBatchCreateRequest,
+    admin_username: str = Depends(get_admin_from_token),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    reserved_codes: set[str] = set()
+    invites: List[RegistrationInvite] = []
+    for _ in range(payload.quantity):
+        code = _generate_unique_invite_code(db, reserved_codes)
+        reserved_codes.add(code)
+        invite = RegistrationInvite(code=code, is_active=True, expires_at=payload.expires_at)
+        db.add(invite)
+        invites.append(invite)
+
+    db.flush()
+    write_admin_audit_log(
+        db,
+        admin_username,
+        "batch_create_invites",
+        target_type="registration_invite",
+        detail={
+            "quantity": payload.quantity,
+            "expires_at": payload.expires_at.isoformat() if payload.expires_at else None,
+        },
+    )
+    db.commit()
+    invite_ids = [invite.id for invite in invites]
+    created_invites = (
+        db.query(RegistrationInvite)
+        .options(joinedload(RegistrationInvite.created_by_user), joinedload(RegistrationInvite.used_by_user))
+        .filter(RegistrationInvite.id.in_(invite_ids))
+        .order_by(RegistrationInvite.created_at.desc(), RegistrationInvite.id.desc())
+        .all()
+    )
+    return [serialize_registration_invite(invite) for invite in created_invites]
+
+
+@router.get("/invites/export")
+async def export_registration_invites(
+    export_format: str = Query("csv", alias="format", pattern="^(csv|txt)$"),
+    _: str = Depends(get_admin_from_token),
+    db: Session = Depends(get_db),
+) -> Response:
+    invites = (
+        db.query(RegistrationInvite)
+        .options(joinedload(RegistrationInvite.created_by_user), joinedload(RegistrationInvite.used_by_user))
+        .order_by(RegistrationInvite.created_at.desc(), RegistrationInvite.id.desc())
+        .all()
+    )
+    filename = f"gankaigc-registration-invites.{export_format}"
+
+    if export_format == "txt":
+        content = "\n".join(invite.code for invite in invites)
+        if content:
+            content += "\n"
+        return Response(
+            content=content,
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    buffer = StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(["code", "is_active", "created_by_type", "used_by_user_id", "created_at"])
+    for invite in invites:
+        writer.writerow(
+            [
+                invite.code,
+                invite.is_active,
+                "user" if invite.created_by_user_id else "admin",
+                invite.used_by_user_id or "",
+                invite.created_at.isoformat() if invite.created_at else "",
+            ]
+        )
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/invites", response_model=List[InviteResponse])
@@ -561,6 +656,29 @@ async def update_announcement(
     db.commit()
     db.refresh(announcement)
     return announcement
+
+
+@router.delete("/announcements/{announcement_id}")
+async def delete_announcement(
+    announcement_id: int,
+    admin_username: str = Depends(get_admin_from_token),
+    db: Session = Depends(get_db),
+) -> Dict[str, str]:
+    announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
+    if not announcement:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="公告不存在")
+
+    write_admin_audit_log(
+        db,
+        admin_username,
+        "delete_announcement",
+        target_type="announcement",
+        target_id=announcement.id,
+        detail={"title": announcement.title, "category": announcement.category},
+    )
+    db.delete(announcement)
+    db.commit()
+    return {"message": "公告已删除"}
 
 
 @router.post("/credit-codes/batch", response_model=List[CreditCodeResponse])

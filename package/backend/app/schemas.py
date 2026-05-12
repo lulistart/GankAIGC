@@ -67,6 +67,11 @@ class InviteCreateRequest(BaseModel):
     expires_at: Optional[datetime] = None
 
 
+class InviteBatchCreateRequest(BaseModel):
+    quantity: Literal[10, 50, 100]
+    expires_at: Optional[datetime] = None
+
+
 class UserInviteResponse(BaseModel):
     id: int
     code: str

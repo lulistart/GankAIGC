@@ -50,6 +50,7 @@ from app.utils.auth import (
     create_access_token,
     verify_token,
 )
+from app.utils.url_security import validate_external_https_url
 from app.utils.time import utcnow
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -154,6 +155,14 @@ MODEL_API_KEY_FIELDS = {
     "COMPRESSION_API_KEY",
 }
 
+MODEL_BASE_URL_FIELDS = {
+    "OPENAI_BASE_URL",
+    "POLISH_BASE_URL",
+    "ENHANCE_BASE_URL",
+    "EMOTION_BASE_URL",
+    "COMPRESSION_BASE_URL",
+}
+
 
 def verify_admin_credentials(username: str, password: str) -> bool:
     return username == settings.ADMIN_USERNAME and password == settings.ADMIN_PASSWORD
@@ -220,6 +229,20 @@ def _api_key_summary(value: str | None) -> Dict[str, Any]:
         "api_key_set": bool(api_key),
         "api_key_last4": api_key[-4:] if api_key else "",
     }
+
+
+def _validate_model_base_url_updates(updates: Dict[str, str]) -> Dict[str, str]:
+    sanitized = dict(updates)
+    for key in MODEL_BASE_URL_FIELDS.intersection(sanitized):
+        value = str(sanitized[key] or "").strip()
+        if not value:
+            sanitized[key] = ""
+            continue
+        try:
+            sanitized[key] = validate_external_https_url(value)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return sanitized
 
 
 def _user_display_name(user: Optional[User], fallback_id: Optional[int] = None) -> Optional[str]:
@@ -1510,6 +1533,7 @@ async def update_config(
         for key, value in updates.items()
         if not (key in MODEL_API_KEY_FIELDS and not str(value or "").strip())
     }
+    updates = _validate_model_base_url_updates(updates)
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="缺少更新内容")
 

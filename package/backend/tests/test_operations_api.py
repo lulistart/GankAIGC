@@ -222,6 +222,28 @@ def test_admin_model_test_returns_structured_failure(client, monkeypatch):
     assert "模型不存在" in response.json()["detail"]["message"]
 
 
+def test_admin_model_config_rejects_private_base_url_before_connection(monkeypatch):
+    monkeypatch.setattr(config_module.settings, "POLISH_MODEL", "gpt-test", raising=False)
+    monkeypatch.setattr(config_module.settings, "POLISH_API_KEY", "sk-test", raising=False)
+    monkeypatch.setattr(config_module.settings, "POLISH_BASE_URL", "https://127.0.0.1/v1", raising=False)
+
+    try:
+        operations_service.get_model_config("polish")
+    except ValueError as exc:
+        assert "Base URL" in str(exc)
+    else:
+        raise AssertionError("private Base URL should be rejected")
+
+
+def test_model_health_url_check_rejects_private_base_url():
+    from app.main import _check_url_format
+
+    is_valid, error = _check_url_format("https://127.0.0.1/v1")
+
+    assert is_valid is False
+    assert "Base URL" in error
+
+
 def test_backup_status_orders_recent_files_first(monkeypatch, tmp_path):
     backup_dir = tmp_path / "backups"
     backup_dir.mkdir()

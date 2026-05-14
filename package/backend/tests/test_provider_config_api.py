@@ -1,3 +1,5 @@
+import socket
+
 from cryptography.fernet import Fernet
 
 import app.config as config_module
@@ -18,6 +20,14 @@ def _admin_auth_headers(client):
 class NoRunBackgroundTasks:
     def add_task(self, *args, **kwargs):
         return None
+
+
+def _allow_public_model_url_dns(monkeypatch):
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443))],
+    )
 
 
 def _create_user(username="alice"):
@@ -41,6 +51,7 @@ def _create_user(username="alice"):
 
 def test_saved_provider_config_is_not_returned_in_plaintext(client, monkeypatch):
     monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
+    _allow_public_model_url_dns(monkeypatch)
     user_id, token = _create_user()
 
     payload = {
@@ -83,6 +94,7 @@ def test_saved_provider_config_is_not_returned_in_plaintext(client, monkeypatch)
 
 def test_admin_provider_config_summary_masks_user_api_key(client, monkeypatch):
     monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
+    _allow_public_model_url_dns(monkeypatch)
     _, token = _create_user()
     client.put(
         "/api/user/provider-config",
@@ -114,6 +126,31 @@ def test_admin_provider_config_summary_masks_user_api_key(client, monkeypatch):
     ]
 
 
+def test_provider_config_rejects_localhost_base_url(client, monkeypatch):
+    monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
+    user_id, token = _create_user()
+
+    response = client.put(
+        "/api/user/provider-config",
+        json={
+            "base_url": "https://localhost/v1",
+            "api_key": "sk-test-secret",
+            "polish_model": "gpt-5.4",
+            "enhance_model": "gpt-5.4",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+    assert "Base URL" in response.json()["detail"]
+
+    db = SessionLocal()
+    try:
+        assert db.query(UserProviderConfig).filter(UserProviderConfig.user_id == user_id).first() is None
+    finally:
+        db.close()
+
+
 def test_byok_start_requires_saved_user_provider(client):
     _, token = _create_user()
 
@@ -136,6 +173,7 @@ def test_byok_start_optimization_uses_saved_user_provider(client, monkeypatch):
 
     monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setattr(optimization, "BackgroundTasks", NoRunBackgroundTasks)
+    _allow_public_model_url_dns(monkeypatch)
     user_id, token = _create_user()
     client.put(
         "/api/user/provider-config",
@@ -182,6 +220,7 @@ def test_retry_failed_session_can_switch_to_saved_user_provider(client, monkeypa
     monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setattr(optimization, "BackgroundTasks", NoRunBackgroundTasks)
     monkeypatch.setattr(optimization, "run_optimization", lambda *args, **kwargs: None)
+    _allow_public_model_url_dns(monkeypatch)
     user_id, token = _create_user()
     client.put(
         "/api/user/provider-config",

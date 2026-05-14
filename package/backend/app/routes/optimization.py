@@ -19,6 +19,7 @@ from app.services.provider_config_service import ProviderConfigService
 from app.services.stream_manager import stream_manager
 from app.services.task_queue import process_session_by_id
 from app.utils.auth import generate_session_id, get_current_user_with_legacy_fallback
+from app.utils.url_security import validate_external_https_url
 from app.utils.time import utcnow
 from datetime import datetime, timedelta
 import asyncio
@@ -128,6 +129,15 @@ def _apply_retry_billing_mode(
             session.charged_credits = 0 if user.is_unlimited else required_credits
 
 
+def _validate_request_model_base_url(config, label: str) -> str:
+    if not config or not config.base_url:
+        raise HTTPException(status_code=400, detail=f"{label} Base URL 未配置")
+    try:
+        return validate_external_https_url(config.base_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/start", response_model=SessionResponse)
 async def start_optimization(
     data: OptimizationCreate,
@@ -170,10 +180,24 @@ async def start_optimization(
         initial_stage = 'polish'
     
     provider_config = None
+    request_polish_base_url = None
+    request_enhance_base_url = None
+    request_emotion_base_url = None
     if data.billing_mode == "byok":
         if data.polish_config:
+            request_polish_base_url = _validate_request_model_base_url(data.polish_config, "润色模型")
+            request_enhance_base_url = (
+                _validate_request_model_base_url(data.enhance_config, "增强模型")
+                if data.enhance_config
+                else request_polish_base_url
+            )
+            request_emotion_base_url = (
+                _validate_request_model_base_url(data.emotion_config, "感情润色模型")
+                if data.emotion_config
+                else None
+            )
             provider_config = {
-                "base_url": data.polish_config.base_url,
+                "base_url": request_polish_base_url,
                 "api_key": data.polish_config.api_key,
                 "polish_model": data.polish_config.model,
                 "enhance_model": data.enhance_config.model if data.enhance_config else data.polish_config.model,
@@ -184,13 +208,13 @@ async def start_optimization(
 
     polish_model = data.polish_config.model if data.polish_config else None
     polish_api_key = data.polish_config.api_key if data.polish_config else None
-    polish_base_url = data.polish_config.base_url if data.polish_config else None
+    polish_base_url = request_polish_base_url
     enhance_model = data.enhance_config.model if data.enhance_config else None
     enhance_api_key = data.enhance_config.api_key if data.enhance_config else None
-    enhance_base_url = data.enhance_config.base_url if data.enhance_config else None
+    enhance_base_url = request_enhance_base_url
     emotion_model = data.emotion_config.model if data.emotion_config else None
     emotion_api_key = data.emotion_config.api_key if data.emotion_config else None
-    emotion_base_url = data.emotion_config.base_url if data.emotion_config else None
+    emotion_base_url = request_emotion_base_url
 
     if provider_config:
         polish_model = provider_config["polish_model"]

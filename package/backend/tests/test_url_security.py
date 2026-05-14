@@ -1,0 +1,98 @@
+import socket
+
+import pytest
+
+
+def _fake_getaddrinfo(*addresses):
+    def fake(host, port, *args, **kwargs):
+        results = []
+        for address in addresses:
+            family = socket.AF_INET6 if ":" in address else socket.AF_INET
+            sockaddr = (address, port or 443, 0, 0) if family == socket.AF_INET6 else (address, port or 443)
+            results.append((family, socket.SOCK_STREAM, 6, "", sockaddr))
+        return results
+
+    return fake
+
+
+def test_external_https_url_is_normalized_after_dns_resolves_to_public_ip(monkeypatch):
+    from app.utils.url_security import validate_external_https_url
+
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("8.8.8.8"))
+
+    assert validate_external_https_url("  https://api.openai.com/v1/  ") == "https://api.openai.com/v1"
+
+
+def test_external_https_url_preserves_nested_path(monkeypatch):
+    from app.utils.url_security import validate_external_https_url
+
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("8.8.8.8"))
+
+    assert (
+        validate_external_https_url("https://gateway.example.com/openai/deployments/prod/")
+        == "https://gateway.example.com/openai/deployments/prod"
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://api.openai.com/v1",
+        "https:///v1",
+        "https://user:pass@api.openai.com/v1",
+        "https://localhost/v1",
+        "https://api.localhost/v1",
+        "https://internal/v1",
+    ],
+)
+def test_external_https_url_rejects_unsafe_url_shapes(value, monkeypatch):
+    from app.utils.url_security import validate_external_https_url
+
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("8.8.8.8"))
+
+    with pytest.raises(ValueError):
+        validate_external_https_url(value)
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "127.0.0.1",
+        "10.0.0.8",
+        "172.16.0.8",
+        "192.168.1.8",
+        "169.254.169.254",
+        "0.0.0.0",
+        "224.0.0.1",
+        "::1",
+        "fe80::1",
+    ],
+)
+def test_external_https_url_rejects_private_or_special_resolved_addresses(address, monkeypatch):
+    from app.utils.url_security import validate_external_https_url
+
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo(address))
+
+    with pytest.raises(ValueError):
+        validate_external_https_url("https://api.openai.com/v1")
+
+
+def test_external_https_url_rejects_if_any_resolved_address_is_private(monkeypatch):
+    from app.utils.url_security import validate_external_https_url
+
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("8.8.8.8", "10.0.0.8"))
+
+    with pytest.raises(ValueError):
+        validate_external_https_url("https://api.openai.com/v1")
+
+
+def test_external_https_url_rejects_unresolvable_hostname(monkeypatch):
+    from app.utils.url_security import validate_external_https_url
+
+    def fail_dns(*args, **kwargs):
+        raise socket.gaierror("not found")
+
+    monkeypatch.setattr(socket, "getaddrinfo", fail_dns)
+
+    with pytest.raises(ValueError):
+        validate_external_https_url("https://api.openai.com/v1")

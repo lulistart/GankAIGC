@@ -15,7 +15,7 @@
 | 编号 | 严重程度 | 状态 | 问题 | 主要文件 |
 | --- | --- | --- | --- | --- |
 | SEC-001 | 严重 | 已完成 | 未登录路径穿越，可读取 `package/static` 外的服务端文件 | `package/main.py` |
-| SEC-002 | 高危 | 待修复 | 用户可控模型 `base_url` 会造成后端 SSRF | `provider_config_service.py`、`optimization.py`、`ai_service.py`、`word_formatter/routes.py` |
+| SEC-002 | 高危 | 已完成 | 用户可控模型 `base_url` 会造成后端 SSRF | `provider_config_service.py`、`optimization.py`、`ai_service.py`、`word_formatter/routes.py` |
 | SEC-003 | 高危 | 待修复 | Docker 在线更新挂载 Docker socket，并执行配置中的 shell 命令 | `docker-compose.yml`、`update_service.py`、`admin.py` |
 | SEC-004 | 高危 | 已完成 | 前端生产依赖存在已知安全公告 | `package/frontend/package.json`、`package-lock.json` |
 | SEC-005 | 高危/中危 | 已完成 | 后端依赖存在已知安全公告 | `package/backend/requirements.txt`、`package/requirements.txt` |
@@ -61,8 +61,8 @@
 
 **实施清单：**
 
-- [ ] 新建 `package/backend/app/utils/url_security.py`。
-- [ ] 实现 `validate_external_https_url(value: str) -> str`，规则如下：
+- [x] 新建 `package/backend/app/utils/url_security.py`。
+- [x] 实现 `validate_external_https_url(value: str) -> str`，规则如下：
   - 必须是 `https://`；
   - 必须有 hostname；
   - 禁止 URL 中带用户名密码；
@@ -71,13 +71,13 @@
   - 所有解析出的 IPv4/IPv6 地址都不能是 loopback、private、link-local、multicast、reserved、unspecified；
   - 禁止云元数据地址，例如 `169.254.169.254`；
   - 只去掉末尾 `/`，不要破坏原有路径。
-- [ ] 新增测试 `package/backend/tests/test_url_security.py`，覆盖允许的公网 HTTPS URL，以及应拒绝的 localhost、私网、link-local、http、带用户名密码 URL。
-- [ ] 在 `ProviderConfigService.save_config` 中使用该校验器。
-- [ ] 在保存 `OptimizationCreate.polish_config/enhance_config/emotion_config.base_url` 前使用该校验器。
-- [ ] 在后台模型配置保存或模型连接测试前使用同一个校验器。
-- [ ] 在 Word Formatter BYOK 服务创建前使用同一个校验器。
-- [ ] 运行 `cd package/backend; python -m pytest tests/test_url_security.py tests/test_provider_config_api.py tests/test_optimization_billing.py -q`。
-- [ ] 运行 `cd package/backend; python -m pytest -q`。
+- [x] 新增测试 `package/backend/tests/test_url_security.py`，覆盖允许的公网 HTTPS URL，以及应拒绝的 localhost、私网、link-local、http、带用户名密码 URL。
+- [x] 在 `ProviderConfigService.save_config` 中使用该校验器。
+- [x] 在保存 `OptimizationCreate.polish_config/enhance_config/emotion_config.base_url` 前使用该校验器。
+- [x] 在后台模型配置保存或模型连接测试前使用同一个校验器。
+- [x] 在 Word Formatter BYOK 服务创建前使用同一个校验器。
+- [x] 运行 `cd package/backend; python -m pytest tests/test_url_security.py tests/test_provider_config_api.py tests/test_optimization_billing.py -q`。
+- [x] 运行 `cd package/backend; python -m pytest -q`。
 
 **完成标准：** 后端在创建任何出站请求前，就拒绝内网地址、localhost、非 HTTPS 地址和云元数据地址。
 
@@ -246,3 +246,4 @@ npm run test:e2e
 | 2026-05-14 | SEC-004 前端依赖安全公告 | 已完成 | `npm audit --omit=dev` 已通过，0 vulnerabilities；`npm run build` 已通过；`npm run test:e2e` 已通过，4 passed |
 | 2026-05-14 | SEC-007 后台配置接口 API Key 脱敏 | 已完成 | 相关后端测试 `tests/test_auth_api.py tests/test_operations_api.py -q` 已通过；前端 `npm run build` 已通过；完整后端测试 `python -m pytest -q` 已通过，211 passed |
 | 2026-05-14 | SEC-005 后端依赖安全公告 | 已完成 | 完整后端测试 `python -m pytest -q` 已通过，211 passed；`uvx pip-audit -r requirements.txt` 已通过，No known vulnerabilities found |
+| 2026-05-14 | SEC-002 BYOK 模型地址 SSRF | 已完成 | 聚焦回归测试已通过，24 passed；相关后端测试已通过，95 passed；完整后端测试 `python -m pytest -q` 已通过，236 passed |

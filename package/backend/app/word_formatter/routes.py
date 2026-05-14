@@ -25,6 +25,7 @@ from app.utils.auth import get_current_user_with_legacy_fallback
 from app.services.ai_service import AIService
 from app.services.credit_service import CreditService
 from app.services.provider_config_service import ProviderConfigService
+from app.utils.url_security import validate_external_https_url
 
 from .services import (
     CompileOptions,
@@ -267,10 +268,11 @@ def get_word_formatter_provider_config(user: User, db: Session, billing_mode: st
 def get_word_formatter_ai_service(provider_config: Optional[dict] = None) -> AIService:
     """Get AI service instance for word formatting."""
     if provider_config:
+        base_url = validate_external_https_url(provider_config.get("base_url") or "")
         return AIService(
             model=provider_config.get("polish_model") or settings.POLISH_MODEL,
             api_key=provider_config.get("api_key"),
-            base_url=provider_config.get("base_url"),
+            base_url=base_url,
         )
 
     return AIService(

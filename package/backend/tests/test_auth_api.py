@@ -847,6 +847,36 @@ def test_admin_config_save_ignores_blank_model_api_key_updates(client, monkeypat
     assert config_module.settings.POLISH_API_KEY == "existing-secret-key"
 
 
+def test_admin_config_rejects_private_model_base_url_update(client, monkeypatch, tmp_path):
+    env_file = tmp_path / ".env"
+    original_env = "\n".join(
+        [
+            "APP_ENV=development",
+            "SECRET_KEY=test-secret-key",
+            "ADMIN_PASSWORD=test-admin-password",
+            "POLISH_BASE_URL=https://api.openai.com/v1",
+        ]
+    )
+    env_file.write_text(original_env, encoding="utf-8")
+
+    monkeypatch.setattr(config_module, "get_env_file_path", lambda: str(env_file))
+    monkeypatch.setattr(config_module.settings, "APP_ENV", "development")
+    monkeypatch.setattr(config_module.settings, "SECRET_KEY", "test-secret-key")
+    monkeypatch.setattr(config_module.settings, "ADMIN_PASSWORD", "test-admin-password")
+    monkeypatch.setattr(config_module.settings, "POLISH_BASE_URL", "https://api.openai.com/v1")
+
+    response = client.post(
+        "/api/admin/config",
+        json={"POLISH_BASE_URL": "https://127.0.0.1/v1"},
+        headers=_admin_auth_headers(client),
+    )
+
+    assert response.status_code == 400
+    assert "Base URL" in response.json()["detail"]
+    assert env_file.read_text(encoding="utf-8") == original_env
+    assert config_module.settings.POLISH_BASE_URL == "https://api.openai.com/v1"
+
+
 def test_worker_healthcheck_is_disabled_in_docker_compose():
     compose_path = Path(__file__).resolve().parents[3] / "docker-compose.yml"
     compose_text = compose_path.read_text(encoding="utf-8")

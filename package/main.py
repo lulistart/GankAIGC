@@ -256,17 +256,12 @@ def _check_url_format(base_url: Optional[str]) -> tuple:
     Returns:
         tuple: (is_valid, error_message)
     """
-    import re
-    
-    if not base_url or not base_url.strip():
-        return False, "Base URL 未配置"
-    
-    # 验证 base_url 是否符合 OpenAI API 格式
-    # 使用更严格的 URL 验证模式
-    url_pattern = re.compile(r'^https?://[^\s/$.?#].[^\s]*$', re.IGNORECASE)
-    if not url_pattern.match(base_url):
-        return False, "Base URL 格式不正确，应为有效的 HTTP/HTTPS URL"
-    
+    from app.utils.url_security import validate_external_https_url
+
+    try:
+        validate_external_https_url(base_url or "")
+    except ValueError as exc:
+        return False, str(exc)
     return True, None
 
 

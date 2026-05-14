@@ -18,6 +18,7 @@ from app.config import (
 from app.database import engine
 from app.models.models import OptimizationSession, RegistrationInvite
 from app.services import update_service
+from app.utils.url_security import validate_external_https_url
 
 
 BACKUP_NAME_PREFIX = "gankaigc_"
@@ -259,12 +260,7 @@ async def get_operations_status(db: Session) -> Dict[str, Any]:
 
 
 def _normalize_base_url(base_url: Optional[str]) -> str:
-    value = (base_url or "").strip().rstrip("/")
-    if not value:
-        raise ValueError("Base URL 未配置")
-    if not value.startswith(("http://", "https://")):
-        raise ValueError("Base URL 必须以 http:// 或 https:// 开头")
-    return value
+    return validate_external_https_url(base_url or "")
 
 
 def _normalize_api_key(api_key: Optional[str]) -> str:

@@ -1,3 +1,5 @@
+import socket
+
 from app.database import SessionLocal
 from app.models.models import CreditTransaction, OptimizationSession, User
 from app.utils.auth import create_user_access_token, get_password_hash
@@ -10,6 +12,14 @@ class NoRunBackgroundTasks:
 
 async def _noop_run_optimization(*args, **kwargs):
     return None
+
+
+def _allow_public_model_url_dns(monkeypatch):
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443))],
+    )
 
 
 def _create_user(credit_balance=0, is_unlimited=False):
@@ -82,6 +92,7 @@ def test_byok_mode_does_not_consume_credits(client, monkeypatch):
     user_id, token = _create_user(credit_balance=0)
     monkeypatch.setattr(optimization, "BackgroundTasks", NoRunBackgroundTasks)
     monkeypatch.setattr(optimization, "run_optimization", _noop_run_optimization)
+    _allow_public_model_url_dns(monkeypatch)
 
     response = client.post(
         "/api/optimization/start",
@@ -109,6 +120,32 @@ def test_byok_mode_does_not_consume_credits(client, monkeypatch):
         assert transactions == []
     finally:
         db.close()
+
+
+def test_byok_mode_rejects_private_request_base_url(client, monkeypatch):
+    from app.routes import optimization
+
+    _, token = _create_user(credit_balance=0)
+    monkeypatch.setattr(optimization, "BackgroundTasks", NoRunBackgroundTasks)
+    monkeypatch.setattr(optimization, "run_optimization", _noop_run_optimization)
+
+    response = client.post(
+        "/api/optimization/start",
+        json={
+            "original_text": "test paragraph",
+            "processing_mode": "paper_polish",
+            "billing_mode": "byok",
+            "polish_config": {
+                "model": "gpt-5.4",
+                "api_key": "sk-test",
+                "base_url": "https://127.0.0.1/v1",
+            },
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+    assert "Base URL" in response.json()["detail"]
 
 
 def test_platform_mode_rejects_user_with_insufficient_credits(client, monkeypatch):

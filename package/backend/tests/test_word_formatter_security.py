@@ -21,3 +21,20 @@ def test_word_formatter_template_ids_use_secrets_not_random():
     assert "secrets.choice" in template_generator
     assert "import random" not in template_generator
     assert "random.choice" not in template_generator
+
+
+def test_word_formatter_byok_ai_service_rejects_private_base_url():
+    from app.word_formatter.routes import get_word_formatter_ai_service
+
+    try:
+        get_word_formatter_ai_service(
+            {
+                "polish_model": "gpt-5.4",
+                "api_key": "sk-test",
+                "base_url": "https://127.0.0.1/v1",
+            }
+        )
+    except Exception as exc:
+        assert "Base URL" in str(exc)
+    else:
+        raise AssertionError("private Base URL should be rejected")

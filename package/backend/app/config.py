@@ -191,11 +191,6 @@ if os.path.exists(_env_path):
     load_dotenv(_env_path, encoding="utf-8-sig")
 
 settings = Settings()
-RUNTIME_SERVER_HOST = settings.SERVER_HOST
-
-
-def get_runtime_server_host() -> str:
-    return RUNTIME_SERVER_HOST
 
 
 def parse_allowed_origins(value: str) -> list[str]:

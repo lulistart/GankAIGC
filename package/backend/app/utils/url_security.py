@@ -112,12 +112,12 @@ def _validate_local_model_proxy_url(
     _get_explicit_port(parsed)
 
     if allow_local_model_proxy is None or server_host is None:
-        from app.config import get_runtime_server_host, settings
+        from app.config import settings
 
         if allow_local_model_proxy is None:
             allow_local_model_proxy = settings.ALLOW_LOCAL_MODEL_PROXY
         if server_host is None:
-            server_host = get_runtime_server_host()
+            server_host = settings.SERVER_HOST
 
     if not allow_local_model_proxy:
         raise ValueError("Base URL 本地代理未启用")

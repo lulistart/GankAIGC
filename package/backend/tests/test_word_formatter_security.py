@@ -47,7 +47,6 @@ def test_word_formatter_byok_ai_service_accepts_local_proxy_in_local_mode(monkey
 
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
 
     service = get_word_formatter_ai_service(
         {

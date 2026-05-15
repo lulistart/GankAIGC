@@ -78,7 +78,7 @@
 - [x] 在 Word Formatter BYOK 服务创建前使用同一个校验器。
 - [x] 增加安全本地代理兼容模式：
   - 默认仍只允许公网 HTTPS Base URL；
-  - 只有 `ALLOW_LOCAL_MODEL_PROXY=true` 且服务启动时的 `SERVER_HOST` 为 `127.0.0.1`、`localhost` 或 `::1` 时，才允许本地 HTTP 代理；
+  - 只有 `ALLOW_LOCAL_MODEL_PROXY=true` 且当前热加载后的 `SERVER_HOST` 为 `127.0.0.1`、`localhost` 或 `::1` 时，才允许本地 HTTP 代理；
   - 本地代理只允许 `127.0.0.1`、`localhost`、`::1`、`host.docker.internal`，并且必须显式填写合法端口；
   - `SERVER_HOST=0.0.0.0`、公网 `http://`、`192.168.*`、`10.*`、`172.16-31.*` 继续拒绝。
 - [x] 运行 `cd package/backend; python -m pytest tests/test_url_security.py tests/test_provider_config_api.py tests/test_optimization_billing.py -q`。

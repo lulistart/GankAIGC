@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import inspect, func, case
 from sqlalchemy.orm import Session, defer, joinedload
 
-from app.config import get_runtime_server_host, reload_settings, settings
+from app.config import reload_settings, settings
 from app.database import get_db
 from app.models.models import (
     AdminAuditLog,
@@ -241,7 +241,7 @@ def _validate_model_base_url_updates(updates: Dict[str, str]) -> Dict[str, str]:
             "yes",
             "on",
         }
-    server_host = get_runtime_server_host()
+    server_host = str(sanitized.get("SERVER_HOST", settings.SERVER_HOST)).strip()
 
     for key in MODEL_BASE_URL_FIELDS.intersection(sanitized):
         value = str(sanitized[key] or "").strip()

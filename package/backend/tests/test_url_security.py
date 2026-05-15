@@ -113,7 +113,6 @@ def test_model_base_url_rejects_local_http_proxy_by_default(monkeypatch):
 
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", False, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
 
     with pytest.raises(ValueError):
         validate_model_base_url("http://127.0.0.1:8317/v1")
@@ -133,7 +132,6 @@ def test_model_base_url_allows_local_http_proxy_when_enabled_and_server_is_local
 
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
 
     assert validate_model_base_url(value) == value.rstrip("/")
 
@@ -143,21 +141,18 @@ def test_model_base_url_rejects_local_http_proxy_when_server_is_exposed(monkeypa
 
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "0.0.0.0", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "0.0.0.0")
 
     with pytest.raises(ValueError):
         validate_model_base_url("http://127.0.0.1:8317/v1")
 
 
-def test_model_base_url_uses_runtime_server_host_not_hot_reloaded_host(monkeypatch):
+def test_model_base_url_uses_hot_reloaded_server_host(monkeypatch):
     from app.utils.url_security import validate_model_base_url
 
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "0.0.0.0")
 
-    with pytest.raises(ValueError):
-        validate_model_base_url("http://127.0.0.1:8317/v1")
+    assert validate_model_base_url("http://127.0.0.1:8317/v1") == "http://127.0.0.1:8317/v1"
 
 
 @pytest.mark.parametrize(
@@ -178,7 +173,6 @@ def test_model_base_url_rejects_unsafe_or_ambiguous_http_urls(value, monkeypatch
 
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
 
     with pytest.raises(ValueError):
         validate_model_base_url(value)

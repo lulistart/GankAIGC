@@ -155,7 +155,6 @@ def test_provider_config_accepts_local_http_proxy_only_in_local_mode(client, mon
     monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
     user_id, token = _create_user()
 
     response = client.put(
@@ -184,7 +183,6 @@ def test_provider_config_rejects_local_http_proxy_when_server_is_exposed(client,
     monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "0.0.0.0", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "0.0.0.0")
     user_id, token = _create_user()
 
     response = client.put(

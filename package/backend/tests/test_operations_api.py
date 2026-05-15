@@ -241,7 +241,6 @@ def test_admin_model_config_accepts_local_proxy_in_local_mode(monkeypatch):
     monkeypatch.setattr(config_module.settings, "POLISH_BASE_URL", "http://host.docker.internal:8317/v1", raising=False)
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "localhost", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "localhost")
 
     config = operations_service.get_model_config("polish")
 
@@ -262,7 +261,6 @@ def test_model_health_url_check_accepts_local_proxy_in_local_mode(monkeypatch):
 
     monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
     monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
-    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
 
     is_valid, error = _check_url_format("http://127.0.0.1:8317/v1")
 

@@ -92,6 +92,7 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     ALLOWED_ORIGINS: str = "http://localhost:9800"
     AUTO_OPEN_BROWSER: bool = True
+    ALLOW_LOCAL_MODEL_PROXY: bool = False
 
     # 数据库配置 - 仅支持 PostgreSQL
     DATABASE_URL: str = DEFAULT_DATABASE_URL
@@ -190,6 +191,11 @@ if os.path.exists(_env_path):
     load_dotenv(_env_path, encoding="utf-8-sig")
 
 settings = Settings()
+RUNTIME_SERVER_HOST = settings.SERVER_HOST
+
+
+def get_runtime_server_host() -> str:
+    return RUNTIME_SERVER_HOST
 
 
 def parse_allowed_origins(value: str) -> list[str]:

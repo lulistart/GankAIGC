@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import inspect, func, case
 from sqlalchemy.orm import Session, defer, joinedload
 
-from app.config import reload_settings, settings
+from app.config import get_runtime_server_host, reload_settings, settings
 from app.database import get_db
 from app.models.models import (
     AdminAuditLog,
@@ -50,7 +50,7 @@ from app.utils.auth import (
     create_access_token,
     verify_token,
 )
-from app.utils.url_security import validate_external_https_url
+from app.utils.url_security import validate_model_base_url
 from app.utils.time import utcnow
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -233,13 +233,27 @@ def _api_key_summary(value: str | None) -> Dict[str, Any]:
 
 def _validate_model_base_url_updates(updates: Dict[str, str]) -> Dict[str, str]:
     sanitized = dict(updates)
+    allow_local_model_proxy = settings.ALLOW_LOCAL_MODEL_PROXY
+    if "ALLOW_LOCAL_MODEL_PROXY" in sanitized:
+        allow_local_model_proxy = str(sanitized["ALLOW_LOCAL_MODEL_PROXY"]).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    server_host = get_runtime_server_host()
+
     for key in MODEL_BASE_URL_FIELDS.intersection(sanitized):
         value = str(sanitized[key] or "").strip()
         if not value:
             sanitized[key] = ""
             continue
         try:
-            sanitized[key] = validate_external_https_url(value)
+            sanitized[key] = validate_model_base_url(
+                value,
+                allow_local_model_proxy=allow_local_model_proxy,
+                server_host=server_host,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return sanitized
@@ -1517,6 +1531,8 @@ async def get_config(_: str = Depends(get_admin_from_token)) -> Dict[str, Any]:
             "max_upload_file_size_mb": settings.MAX_UPLOAD_FILE_SIZE_MB,
             "api_request_interval": settings.API_REQUEST_INTERVAL,
             "registration_enabled": settings.REGISTRATION_ENABLED,
+            "server_host": settings.SERVER_HOST,
+            "allow_local_model_proxy": settings.ALLOW_LOCAL_MODEL_PROXY,
         },
     }
 

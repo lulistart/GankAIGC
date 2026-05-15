@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.models import User, UserProviderConfig
 from app.schemas import ProviderConfigResponse, ProviderConfigUpdateRequest
 from app.utils.crypto import decrypt_secret, encrypt_secret
-from app.utils.url_security import validate_external_https_url
+from app.utils.url_security import validate_model_base_url
 
 
 class ProviderConfigService:
@@ -18,7 +18,7 @@ class ProviderConfigService:
             self.db.add(config)
 
         try:
-            config.base_url = validate_external_https_url(payload.base_url)
+            config.base_url = validate_model_base_url(payload.base_url)
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         config.api_key_encrypted = encrypt_secret(payload.api_key)
@@ -56,6 +56,6 @@ class ProviderConfigService:
 
     def _validated_runtime_base_url(self, base_url: str) -> str:
         try:
-            return validate_external_https_url(base_url)
+            return validate_model_base_url(base_url)
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

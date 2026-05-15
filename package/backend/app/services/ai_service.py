@@ -3,7 +3,7 @@ import json
 import re
 from openai import AsyncOpenAI, PermissionDeniedError, AuthenticationError, RateLimitError
 from app.config import settings
-from app.utils.url_security import validate_external_https_url
+from app.utils.url_security import validate_model_base_url
 
 
 # 不可重试的错误类型 - 这些错误不应该通过降级重试来解决
@@ -144,7 +144,7 @@ class AIService:
         self.api_key = api_key or settings.OPENAI_API_KEY
         
         raw_base_url = base_url or settings.OPENAI_BASE_URL
-        self.base_url = validate_external_https_url(raw_base_url) if raw_base_url else None
+        self.base_url = validate_model_base_url(raw_base_url) if raw_base_url else None
         
         # 验证必需的配置
         if not self.api_key:

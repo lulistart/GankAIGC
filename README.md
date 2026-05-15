@@ -231,6 +231,22 @@ EMOTION_API_KEY=你的API密钥
 EMOTION_BASE_URL=https://api.openai.com/v1
 ```
 
+如果你在本机使用 `cliproxy`、`new-api` 这类本地代理，并且地址是
+`http://127.0.0.1:8317/v1` 这种 HTTP 地址，需要同时满足：
+
+```env
+SERVER_HOST=127.0.0.1
+ALLOW_LOCAL_MODEL_PROXY=true
+POLISH_BASE_URL=http://127.0.0.1:8317/v1
+```
+
+修改 `SERVER_HOST` 或 `ALLOW_LOCAL_MODEL_PROXY` 后建议重启服务；本地代理安全边界按服务启动时的绑定地址判断。
+
+本地 Docker 访问宿主机代理时，Base URL 可写成
+`http://host.docker.internal:8317/v1`。公网或 VPS 部署不要开启本地代理模式；
+`SERVER_HOST=0.0.0.0` 时系统会拒绝本地 HTTP 代理，必须使用公网 HTTPS
+代理地址，例如 `https://proxy.example.com/v1`。
+
 生成密钥示例：
 
 ```bash
@@ -325,6 +341,22 @@ POLISH_MODEL=gpt-5.5
 POLISH_API_KEY=你的API密钥
 POLISH_BASE_URL=https://api.openai.com/v1
 ```
+
+Docker/VPS 公网部署必须使用公网 HTTPS Base URL，不要开启本地代理模式：
+
+```env
+ALLOW_LOCAL_MODEL_PROXY=false
+```
+
+只有本机 Docker 测试需要连接宿主机上的本地代理时，才可以把服务改成本机绑定：
+
+```env
+SERVER_HOST=127.0.0.1
+ALLOW_LOCAL_MODEL_PROXY=true
+POLISH_BASE_URL=http://host.docker.internal:8317/v1
+```
+
+修改 `SERVER_HOST` 或 `ALLOW_LOCAL_MODEL_PROXY` 后建议重启服务；本地代理安全边界按服务启动时的绑定地址判断。
 
 #### 3）启动
 

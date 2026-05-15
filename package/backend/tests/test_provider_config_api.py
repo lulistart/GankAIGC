@@ -151,6 +151,63 @@ def test_provider_config_rejects_localhost_base_url(client, monkeypatch):
         db.close()
 
 
+def test_provider_config_accepts_local_http_proxy_only_in_local_mode(client, monkeypatch):
+    monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
+    user_id, token = _create_user()
+
+    response = client.put(
+        "/api/user/provider-config",
+        json={
+            "base_url": "http://127.0.0.1:8317/v1/",
+            "api_key": "sk-test-secret",
+            "polish_model": "gpt-5.4",
+            "enhance_model": "gpt-5.4",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["base_url"] == "http://127.0.0.1:8317/v1"
+
+    db = SessionLocal()
+    try:
+        config = db.query(UserProviderConfig).filter(UserProviderConfig.user_id == user_id).one()
+        assert config.base_url == "http://127.0.0.1:8317/v1"
+    finally:
+        db.close()
+
+
+def test_provider_config_rejects_local_http_proxy_when_server_is_exposed(client, monkeypatch):
+    monkeypatch.setattr(config_module.settings, "ENCRYPTION_KEY", Fernet.generate_key().decode())
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "0.0.0.0", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "0.0.0.0")
+    user_id, token = _create_user()
+
+    response = client.put(
+        "/api/user/provider-config",
+        json={
+            "base_url": "http://127.0.0.1:8317/v1",
+            "api_key": "sk-test-secret",
+            "polish_model": "gpt-5.4",
+            "enhance_model": "gpt-5.4",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+    assert "Base URL" in response.json()["detail"]
+
+    db = SessionLocal()
+    try:
+        assert db.query(UserProviderConfig).filter(UserProviderConfig.user_id == user_id).first() is None
+    finally:
+        db.close()
+
+
 def test_byok_start_requires_saved_user_provider(client):
     _, token = _create_user()
 

@@ -235,6 +235,19 @@ def test_admin_model_config_rejects_private_base_url_before_connection(monkeypat
         raise AssertionError("private Base URL should be rejected")
 
 
+def test_admin_model_config_accepts_local_proxy_in_local_mode(monkeypatch):
+    monkeypatch.setattr(config_module.settings, "POLISH_MODEL", "gpt-test", raising=False)
+    monkeypatch.setattr(config_module.settings, "POLISH_API_KEY", "sk-test", raising=False)
+    monkeypatch.setattr(config_module.settings, "POLISH_BASE_URL", "http://host.docker.internal:8317/v1", raising=False)
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "localhost", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "localhost")
+
+    config = operations_service.get_model_config("polish")
+
+    assert config["base_url"] == "http://host.docker.internal:8317/v1"
+
+
 def test_model_health_url_check_rejects_private_base_url():
     from app.main import _check_url_format
 
@@ -242,6 +255,19 @@ def test_model_health_url_check_rejects_private_base_url():
 
     assert is_valid is False
     assert "Base URL" in error
+
+
+def test_model_health_url_check_accepts_local_proxy_in_local_mode(monkeypatch):
+    from app.main import _check_url_format
+
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
+
+    is_valid, error = _check_url_format("http://127.0.0.1:8317/v1")
+
+    assert is_valid is True
+    assert error is None
 
 
 def test_backup_status_orders_recent_files_first(monkeypatch, tmp_path):

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import { Settings, Save, RefreshCw, Cpu, Brain, PlugZap } from 'lucide-react';
+import { Settings, Save, RefreshCw, Cpu, Brain, PlugZap, ShieldCheck } from 'lucide-react';
 import ApiConfigGuide from './ApiConfigGuide';
 
 const ConfigManager = ({ adminToken }) => {
@@ -33,6 +33,8 @@ const ConfigManager = ({ adminToken }) => {
     SEGMENT_SKIP_THRESHOLD: '',
     API_REQUEST_INTERVAL: '',
     REGISTRATION_ENABLED: true,
+    SERVER_HOST: '',
+    ALLOW_LOCAL_MODEL_PROXY: false,
     THINKING_MODE_ENABLED: true,
     THINKING_MODE_EFFORT: 'high'
   });
@@ -85,6 +87,8 @@ const ConfigManager = ({ adminToken }) => {
         SEGMENT_SKIP_THRESHOLD: response.data.system.segment_skip_threshold?.toString() || '',
         API_REQUEST_INTERVAL: response.data.system.api_request_interval?.toString() || '6',
         REGISTRATION_ENABLED: response.data.system.registration_enabled ?? true,
+        SERVER_HOST: response.data.system.server_host || '0.0.0.0',
+        ALLOW_LOCAL_MODEL_PROXY: response.data.system.allow_local_model_proxy ?? false,
         THINKING_MODE_ENABLED: response.data.thinking?.enabled ?? true,
         THINKING_MODE_EFFORT: response.data.thinking?.effort || 'high'
       });
@@ -145,6 +149,9 @@ const ConfigManager = ({ adminToken }) => {
     }
     return 'sk-... 或 Google API Key';
   };
+
+  const localProxyEnabledSafely =
+    formData.ALLOW_LOCAL_MODEL_PROXY && ['127.0.0.1', 'localhost', '::1'].includes((formData.SERVER_HOST || '').trim().toLowerCase());
 
   const renderTestButton = (stage) => (
     <button
@@ -471,6 +478,74 @@ const ConfigManager = ({ adminToken }) => {
               : 'translate-x-0'
               }`} />
           </button>
+        </div>
+      </div>
+
+      {/* 本地模型代理 */}
+      <div className="bg-white rounded-2xl shadow-ios p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 bg-sky-50 rounded-xl flex items-center justify-center">
+            <ShieldCheck className="w-5 h-5 text-sky-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">本地模型代理</h3>
+            <p className="text-xs text-gray-400">只允许本机运行时使用 http://127.0.0.1:端口/v1</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-500 mb-2">
+              SERVER_HOST
+            </label>
+            <input
+              type="text"
+              value={formData.SERVER_HOST}
+              onChange={(e) => setFormData({ ...formData, SERVER_HOST: e.target.value })}
+              placeholder="127.0.0.1"
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm font-mono"
+            />
+            <p className="mt-1.5 text-xs text-gray-400">
+              公网部署通常是 0.0.0.0；本机专用可设为 127.0.0.1
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-6 rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                允许本地 HTTP 模型代理
+              </label>
+              <p className="text-xs text-gray-400 mt-1">
+                仅当 SERVER_HOST 为 127.0.0.1、localhost 或 ::1 时生效
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFormData({
+                ...formData,
+                ALLOW_LOCAL_MODEL_PROXY: !formData.ALLOW_LOCAL_MODEL_PROXY
+              })}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ${formData.ALLOW_LOCAL_MODEL_PROXY
+                ? 'bg-sky-600'
+                : 'bg-gray-200'
+                }`}
+              aria-pressed={formData.ALLOW_LOCAL_MODEL_PROXY}
+            >
+              <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${formData.ALLOW_LOCAL_MODEL_PROXY
+                ? 'translate-x-5'
+                : 'translate-x-0'
+                }`} />
+            </button>
+          </div>
+        </div>
+
+        <div className={`mt-4 rounded-xl border p-4 text-sm ${localProxyEnabledSafely
+          ? 'border-sky-100 bg-sky-50/70 text-sky-800'
+          : 'border-amber-100 bg-amber-50/70 text-amber-800'
+          }`}>
+          {localProxyEnabledSafely
+            ? '当前会允许 127.0.0.1、localhost、::1、host.docker.internal 的显式端口 HTTP 模型代理。'
+            : '当前不会放行本地 HTTP 模型代理；公网或 0.0.0.0 部署必须使用公网 HTTPS Base URL。'}
         </div>
       </div>
 

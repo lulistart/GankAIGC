@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import app.config as config_module
+
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 WORD_FORMATTER_ROOT = PACKAGE_ROOT / "backend" / "app" / "word_formatter"
@@ -38,3 +40,21 @@ def test_word_formatter_byok_ai_service_rejects_private_base_url():
         assert "Base URL" in str(exc)
     else:
         raise AssertionError("private Base URL should be rejected")
+
+
+def test_word_formatter_byok_ai_service_accepts_local_proxy_in_local_mode(monkeypatch):
+    from app.word_formatter.routes import get_word_formatter_ai_service
+
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
+
+    service = get_word_formatter_ai_service(
+        {
+            "polish_model": "gpt-5.4",
+            "api_key": "sk-test",
+            "base_url": "http://localhost:8317/v1",
+        }
+    )
+
+    assert service.base_url == "http://localhost:8317/v1"

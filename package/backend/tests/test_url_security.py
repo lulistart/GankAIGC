@@ -2,6 +2,8 @@ import socket
 
 import pytest
 
+import app.config as config_module
+
 
 def _fake_getaddrinfo(*addresses):
     def fake(host, port, *args, **kwargs):
@@ -96,3 +98,87 @@ def test_external_https_url_rejects_unresolvable_hostname(monkeypatch):
 
     with pytest.raises(ValueError):
         validate_external_https_url("https://api.openai.com/v1")
+
+
+def test_model_base_url_accepts_public_https_url(monkeypatch):
+    from app.utils.url_security import validate_model_base_url
+
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("8.8.8.8"))
+
+    assert validate_model_base_url("  https://api.openai.com/v1/  ") == "https://api.openai.com/v1"
+
+
+def test_model_base_url_rejects_local_http_proxy_by_default(monkeypatch):
+    from app.utils.url_security import validate_model_base_url
+
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", False, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
+
+    with pytest.raises(ValueError):
+        validate_model_base_url("http://127.0.0.1:8317/v1")
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://127.0.0.1:8317/v1/",
+        "http://localhost:3000/v1",
+        "http://[::1]:8080/v1",
+        "http://host.docker.internal:8317/v1",
+    ],
+)
+def test_model_base_url_allows_local_http_proxy_when_enabled_and_server_is_local(value, monkeypatch):
+    from app.utils.url_security import validate_model_base_url
+
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
+
+    assert validate_model_base_url(value) == value.rstrip("/")
+
+
+def test_model_base_url_rejects_local_http_proxy_when_server_is_exposed(monkeypatch):
+    from app.utils.url_security import validate_model_base_url
+
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "0.0.0.0", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "0.0.0.0")
+
+    with pytest.raises(ValueError):
+        validate_model_base_url("http://127.0.0.1:8317/v1")
+
+
+def test_model_base_url_uses_runtime_server_host_not_hot_reloaded_host(monkeypatch):
+    from app.utils.url_security import validate_model_base_url
+
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "0.0.0.0")
+
+    with pytest.raises(ValueError):
+        validate_model_base_url("http://127.0.0.1:8317/v1")
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://192.168.1.10:8317/v1",
+        "http://10.0.0.1:8317/v1",
+        "http://172.16.0.10:8317/v1",
+        "http://proxy.example.com/v1",
+        "http://127.0.0.1/v1",
+        "http://127.0.0.1:0/v1",
+        "http://127.0.0.1:65536/v1",
+        "http://user:pass@127.0.0.1:8317/v1",
+    ],
+)
+def test_model_base_url_rejects_unsafe_or_ambiguous_http_urls(value, monkeypatch):
+    from app.utils.url_security import validate_model_base_url
+
+    monkeypatch.setattr(config_module.settings, "ALLOW_LOCAL_MODEL_PROXY", True, raising=False)
+    monkeypatch.setattr(config_module.settings, "SERVER_HOST", "127.0.0.1", raising=False)
+    monkeypatch.setattr(config_module, "RUNTIME_SERVER_HOST", "127.0.0.1")
+
+    with pytest.raises(ValueError):
+        validate_model_base_url(value)

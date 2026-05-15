@@ -76,6 +76,11 @@
 - [x] 在保存 `OptimizationCreate.polish_config/enhance_config/emotion_config.base_url` 前使用该校验器。
 - [x] 在后台模型配置保存或模型连接测试前使用同一个校验器。
 - [x] 在 Word Formatter BYOK 服务创建前使用同一个校验器。
+- [x] 增加安全本地代理兼容模式：
+  - 默认仍只允许公网 HTTPS Base URL；
+  - 只有 `ALLOW_LOCAL_MODEL_PROXY=true` 且服务启动时的 `SERVER_HOST` 为 `127.0.0.1`、`localhost` 或 `::1` 时，才允许本地 HTTP 代理；
+  - 本地代理只允许 `127.0.0.1`、`localhost`、`::1`、`host.docker.internal`，并且必须显式填写合法端口；
+  - `SERVER_HOST=0.0.0.0`、公网 `http://`、`192.168.*`、`10.*`、`172.16-31.*` 继续拒绝。
 - [x] 运行 `cd package/backend; python -m pytest tests/test_url_security.py tests/test_provider_config_api.py tests/test_optimization_billing.py -q`。
 - [x] 运行 `cd package/backend; python -m pytest -q`。
 
@@ -232,7 +237,9 @@ npm run test:e2e
 - [ ] `GET /%2e%2e%2fmain.py` 返回 `404`。
 - [ ] 登录、工作台、开始降 AI、会话详情、导出仍可用。
 - [ ] 管理员登录、配置查看/保存、运维状态、数据库只读查看仍可用。
-- [ ] BYOK 拒绝 `http://127.0.0.1:...`、`https://localhost/...`、`https://169.254.169.254/...`。
+- [ ] 默认配置下 BYOK 拒绝 `http://127.0.0.1:...`、`https://localhost/...`、`https://169.254.169.254/...`。
+- [ ] 开启本地代理模式且 `SERVER_HOST=127.0.0.1` 时，BYOK 接受 `http://127.0.0.1:8317/v1`。
+- [ ] `SERVER_HOST=0.0.0.0` 时，即使开启本地代理模式，也拒绝 `http://127.0.0.1:8317/v1`。
 - [ ] BYOK 接受已知的公网 HTTPS OpenAI 兼容接口。
 
 ---
@@ -247,3 +254,4 @@ npm run test:e2e
 | 2026-05-14 | SEC-007 后台配置接口 API Key 脱敏 | 已完成 | 相关后端测试 `tests/test_auth_api.py tests/test_operations_api.py -q` 已通过；前端 `npm run build` 已通过；完整后端测试 `python -m pytest -q` 已通过，211 passed |
 | 2026-05-14 | SEC-005 后端依赖安全公告 | 已完成 | 完整后端测试 `python -m pytest -q` 已通过，211 passed；`uvx pip-audit -r requirements.txt` 已通过，No known vulnerabilities found |
 | 2026-05-14 | SEC-002 BYOK 模型地址 SSRF | 已完成 | 聚焦回归测试已通过，24 passed；相关后端测试已通过，95 passed；完整后端测试 `python -m pytest -q` 已通过，236 passed |
+| 2026-05-15 | SEC-002 本地模型代理兼容 | 已完成 | 增加 `ALLOW_LOCAL_MODEL_PROXY` 安全开关；仅本机绑定允许本地 HTTP 代理，公网绑定继续拒绝 |

@@ -19,7 +19,7 @@ from app.services.provider_config_service import ProviderConfigService
 from app.services.stream_manager import stream_manager
 from app.services.task_queue import process_session_by_id
 from app.utils.auth import generate_session_id, get_current_user_with_legacy_fallback
-from app.utils.url_security import validate_external_https_url
+from app.utils.url_security import validate_model_base_url
 from app.utils.time import utcnow
 from datetime import datetime, timedelta
 import asyncio
@@ -133,7 +133,7 @@ def _validate_request_model_base_url(config, label: str) -> str:
     if not config or not config.base_url:
         raise HTTPException(status_code=400, detail=f"{label} Base URL 未配置")
     try:
-        return validate_external_https_url(config.base_url)
+        return validate_model_base_url(config.base_url)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

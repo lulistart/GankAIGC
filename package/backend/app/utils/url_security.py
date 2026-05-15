@@ -3,6 +3,10 @@ import socket
 from urllib.parse import urlparse
 
 
+LOCAL_MODEL_PROXY_HOSTS = {"127.0.0.1", "localhost", "::1", "host.docker.internal"}
+LOCAL_SERVER_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
 def _parse_ip_address(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     try:
         return ipaddress.ip_address(value)
@@ -73,3 +77,85 @@ def validate_external_https_url(value: str) -> str:
             raise ValueError("Base URL 必须解析到公网 IP，不能指向内网、本机或云元数据地址")
 
     return normalized
+
+
+def _is_local_model_proxy_hostname(hostname: str) -> bool:
+    return hostname.rstrip(".").lower() in LOCAL_MODEL_PROXY_HOSTS
+
+
+def _get_explicit_port(parsed) -> int:
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Base URL 本地代理端口不正确") from exc
+    if port is None:
+        raise ValueError("Base URL 本地代理必须显式填写端口")
+    if port < 1 or port > 65535:
+        raise ValueError("Base URL 本地代理端口不正确")
+    return port
+
+
+def _validate_local_model_proxy_url(
+    normalized: str,
+    parsed,
+    *,
+    allow_local_model_proxy: bool | None = None,
+    server_host: str | None = None,
+) -> str:
+    if parsed.scheme.lower() != "http":
+        raise ValueError("Base URL 本地代理仅允许 http://")
+    if parsed.username or parsed.password:
+        raise ValueError("Base URL 禁止包含用户名或密码")
+    if not parsed.hostname or not _is_local_model_proxy_hostname(parsed.hostname):
+        raise ValueError("Base URL 本地代理只能使用 127.0.0.1、localhost、::1 或 host.docker.internal")
+
+    _get_explicit_port(parsed)
+
+    if allow_local_model_proxy is None or server_host is None:
+        from app.config import get_runtime_server_host, settings
+
+        if allow_local_model_proxy is None:
+            allow_local_model_proxy = settings.ALLOW_LOCAL_MODEL_PROXY
+        if server_host is None:
+            server_host = get_runtime_server_host()
+
+    if not allow_local_model_proxy:
+        raise ValueError("Base URL 本地代理未启用")
+
+    normalized_server_host = (server_host or "").strip().rstrip(".").lower()
+    if normalized_server_host not in LOCAL_SERVER_HOSTS:
+        raise ValueError("Base URL 本地代理只允许在 SERVER_HOST 为 127.0.0.1、localhost 或 ::1 时使用")
+
+    return normalized
+
+
+def validate_model_base_url(
+    value: str,
+    *,
+    allow_local_model_proxy: bool | None = None,
+    server_host: str | None = None,
+) -> str:
+    """Validate model Base URL, allowing only public HTTPS or explicit local proxy mode."""
+    normalized = (value or "").strip().rstrip("/")
+    if not normalized:
+        raise ValueError("Base URL 未配置")
+
+    try:
+        parsed = urlparse(normalized)
+    except ValueError as exc:
+        raise ValueError("Base URL 格式不正确") from exc
+
+    if parsed.username or parsed.password:
+        raise ValueError("Base URL 禁止包含用户名或密码")
+    if not parsed.hostname:
+        raise ValueError("Base URL 必须包含有效域名")
+
+    if parsed.scheme.lower() == "http":
+        return _validate_local_model_proxy_url(
+            normalized,
+            parsed,
+            allow_local_model_proxy=allow_local_model_proxy,
+            server_host=server_host,
+        )
+
+    return validate_external_https_url(normalized)

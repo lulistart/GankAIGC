@@ -256,10 +256,10 @@ def _check_url_format(base_url: Optional[str]) -> tuple:
     Returns:
         tuple: (is_valid, error_message)
     """
-    from app.utils.url_security import validate_external_https_url
+    from app.utils.url_security import validate_model_base_url
 
     try:
-        validate_external_https_url(base_url or "")
+        validate_model_base_url(base_url or "")
     except ValueError as exc:
         return False, str(exc)
     return True, None
@@ -571,6 +571,7 @@ ALLOWED_ORIGINS=http://localhost:9800
 AUTO_OPEN_BROWSER=true
 ENABLE_VERBOSE_AI_LOGS=false
 ENCRYPTION_KEY=
+ALLOW_LOCAL_MODEL_PROXY=false
 AUTH_RATE_LIMIT_PER_MINUTE=10
 REDEEM_RATE_LIMIT_PER_MINUTE=20
 REGISTRATION_ENABLED=true

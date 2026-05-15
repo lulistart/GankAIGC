@@ -102,6 +102,7 @@ function Write-DotEnv($Settings, [string]$Path) {
         (EnvLine 'ALLOWED_ORIGINS'),
         (EnvLine 'AUTO_OPEN_BROWSER'),
         (EnvLine 'ENABLE_VERBOSE_AI_LOGS'),
+        (EnvLine 'ALLOW_LOCAL_MODEL_PROXY'),
         '',
         (EnvLine 'POSTGRES_HOST'),
         (EnvLine 'POSTGRES_PORT'),
@@ -171,6 +172,7 @@ function Ensure-EnvFile() {
     Set-Default $settings 'ALLOWED_ORIGINS' 'http://localhost:9800,http://127.0.0.1:9800'
     Set-Default $settings 'AUTO_OPEN_BROWSER' 'true'
     Set-Default $settings 'ENABLE_VERBOSE_AI_LOGS' 'false'
+    Set-Default $settings 'ALLOW_LOCAL_MODEL_PROXY' 'false'
 
     Set-Default $settings 'POSTGRES_HOST' '127.0.0.1'
     Set-Default $settings 'POSTGRES_PORT' '55432'

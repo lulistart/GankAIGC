@@ -165,12 +165,10 @@ class Settings(BaseSettings):
     TASK_WORKER_POLL_INTERVAL: float = 2.0
     TASK_WORKER_HEARTBEAT_INTERVAL: float = 30.0
     TASK_WORKER_STALE_TIMEOUT_SECONDS: int = 1800
-    VPS_UPDATE_ENABLED: bool = True
+    VPS_UPDATE_ENABLED: bool = False
     VPS_UPDATE_WORKDIR: str = "/app/source"
     VPS_UPDATE_LOG_FILE: str = "/app/source/logs/vps-update.log"
-    VPS_UPDATE_COMMAND: str = (
-        "docker compose --env-file .env.docker --profile update up --build -d updater"
-    )
+    VPS_UPDATE_COMMAND: str = "docker compose --env-file .env.docker pull && docker compose --env-file .env.docker up -d"
     BACKUP_DIR: str = "backups"
     BACKUP_RETENTION_DAYS: int = 14
     BACKUP_INTERVAL_SECONDS: int = 86400

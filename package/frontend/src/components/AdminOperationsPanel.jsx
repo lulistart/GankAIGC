@@ -100,14 +100,14 @@ const AdminOperationsPanel = ({ adminToken }) => {
   const databaseOk = status?.database?.ok;
   const workerOk = status?.worker?.ok;
   const backupOk = status?.backup?.enabled && status?.backup?.total_files > 0;
-  const updateOk = status?.update?.can_run;
+  const updateManual = status?.update?.mode === 'manual_ssh';
 
   return (
     <div className="space-y-6" data-admin-operations-panel="true">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">运维状态</h2>
-          <p className="mt-1 text-sm text-gray-500">检查数据库、worker、备份和 VPS 在线更新是否处于可用状态</p>
+          <p className="mt-1 text-sm text-gray-500">检查数据库、worker、备份和版本更新状态</p>
         </div>
         <button
           onClick={fetchStatus}
@@ -140,9 +140,9 @@ const AdminOperationsPanel = ({ adminToken }) => {
           </div>
         </InfoCard>
 
-        <InfoCard icon={Server} title="在线更新" value={updateOk ? '可用' : '未就绪'} ok={updateOk}>
+        <InfoCard icon={Server} title="在线更新" value={updateManual ? '手动 SSH' : '未就绪'} ok={updateManual}>
           <div className="space-y-1">
-            <div>Docker socket：{status?.update?.docker_socket_mounted ? '已挂载' : '未挂载'}</div>
+            <div>模式：{updateManual ? '复制命令后 SSH 执行' : '-'}</div>
             <div>源码更新：{status?.update?.source_update_available === true ? '有新提交' : status?.update?.source_update_available === false ? '已最新' : '未检测'}</div>
           </div>
         </InfoCard>

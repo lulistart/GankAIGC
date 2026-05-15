@@ -248,6 +248,7 @@ async def get_operations_status(db: Session) -> Dict[str, Any]:
         "onboarding": get_onboarding_status(db, backup_status),
         "update": {
             "enabled": settings.VPS_UPDATE_ENABLED,
+            "mode": "manual_ssh",
             "can_run": can_run_update,
             "disabled_reason": disabled_reason,
             "workdir": settings.VPS_UPDATE_WORKDIR,

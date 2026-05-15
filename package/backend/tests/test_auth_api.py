@@ -1003,8 +1003,11 @@ def test_docker_services_mount_env_docker_as_runtime_config():
 
     for section in (app_section, worker_section):
         assert "GANKAIGC_ENV_FILE: /app/config/.env.docker" in section
-        assert "source: ${GANKAIGC_HOST_PROJECT_DIR:-${PWD:-.}}/.env.docker" in section
         assert "target: /app/config/.env.docker" in section
+
+    assert "source: ./.env.docker" in app_section
+    assert "GANKAIGC_HOST_PROJECT_DIR" not in app_section
+    assert "source: ${GANKAIGC_HOST_PROJECT_DIR:-${PWD:-.}}/.env.docker" in worker_section
 
 
 def test_dockerfile_creates_runtime_config_mount_directory():

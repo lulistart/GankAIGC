@@ -1,8 +1,5 @@
-import asyncio
 import os
-import shlex
 import subprocess
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 import httpx
@@ -11,6 +8,13 @@ from app.config import settings
 
 
 GITHUB_API_BASE = "https://api.github.com"
+MANUAL_DOCKER_UPDATE_COMMAND = (
+    "docker compose --env-file .env.docker pull\n"
+    "docker compose --env-file .env.docker up -d"
+)
+MANUAL_UPDATE_DISABLED_REASON = (
+    "为降低风险，后台不直接控制 Docker。请 SSH 到 VPS 执行升级命令。"
+)
 
 
 def normalize_version(version: str) -> str:
@@ -118,27 +122,12 @@ def get_git_revision_status() -> Dict[str, Any]:
         }
 
 
-def _update_enabled_message() -> str:
-    return (
-        "请使用最新 docker-compose.yml 重建 app 容器，确认 /app/source 和 "
-        "/var/run/docker.sock 已挂载，并在 .env.docker 设置 VPS_UPDATE_ENABLED=true。"
-    )
-
-
 def get_vps_update_command() -> str:
-    return "docker compose --env-file .env.docker --profile update up --build -d updater"
+    return MANUAL_DOCKER_UPDATE_COMMAND
 
 
 def can_run_vps_update() -> Tuple[bool, Optional[str]]:
-    if not settings.VPS_UPDATE_ENABLED:
-        return False, "VPS 在线更新未启用。" + _update_enabled_message()
-    if not os.path.isdir(settings.VPS_UPDATE_WORKDIR):
-        return False, f"源码目录不存在: {settings.VPS_UPDATE_WORKDIR}"
-    if not os.path.exists("/var/run/docker.sock"):
-        return False, "容器内未挂载 /var/run/docker.sock，无法调用宿主机 Docker。"
-    if not os.environ.get("GANKAIGC_HOST_PROJECT_DIR"):
-        return False, "容器内未设置 GANKAIGC_HOST_PROJECT_DIR，请使用最新 docker-compose.yml 重建 app 容器。"
-    return True, None
+    return False, MANUAL_UPDATE_DISABLED_REASON
 
 
 async def build_update_status() -> Dict[str, Any]:
@@ -167,34 +156,13 @@ async def build_update_status() -> Dict[str, Any]:
         "remote_commit": git_status.get("remote_commit"),
         "git_error": git_status.get("error"),
         "vps_update_enabled": settings.VPS_UPDATE_ENABLED,
+        "update_mode": "manual_ssh",
         "can_run_update": can_run_update,
         "disabled_reason": disabled_reason,
         "setup_command": get_vps_update_command(),
-        "manual_update_command": settings.VPS_UPDATE_COMMAND,
+        "manual_update_command": get_vps_update_command(),
     }
 
 
 def start_vps_update() -> Dict[str, Any]:
-    can_run_update, disabled_reason = can_run_vps_update()
-    if not can_run_update:
-        raise RuntimeError(disabled_reason or "VPS 在线更新不可用")
-
-    os.makedirs(os.path.dirname(settings.VPS_UPDATE_LOG_FILE), exist_ok=True)
-    with open(settings.VPS_UPDATE_LOG_FILE, "a", encoding="utf-8") as log_file:
-        log_file.write(f"\n[{datetime.now(timezone.utc).isoformat()}] start vps update\n")
-        log_file.flush()
-        subprocess.Popen(
-            settings.VPS_UPDATE_COMMAND,
-            cwd=settings.VPS_UPDATE_WORKDIR,
-            shell=True,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-
-    return {
-        "started": True,
-        "message": "VPS 更新任务已启动，服务会在拉取代码并重建容器后短暂重启。",
-        "command": settings.VPS_UPDATE_COMMAND,
-        "log_file": settings.VPS_UPDATE_LOG_FILE,
-    }
+    raise RuntimeError(MANUAL_UPDATE_DISABLED_REASON)

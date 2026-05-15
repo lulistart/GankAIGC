@@ -87,7 +87,6 @@ jobs:
         run: |
           cp .env.docker.example .env.docker
           docker compose --env-file .env.docker config --quiet
-          docker compose --env-file .env.docker --profile update config --quiet
 
       - name: Build Docker image
         run: docker build --build-arg DOCKER_IMAGE_PREFIX= -t gankaigc:ci .

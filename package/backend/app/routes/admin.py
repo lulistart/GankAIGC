@@ -396,30 +396,13 @@ async def get_update_status(_: str = Depends(get_admin_from_token)) -> Dict[str,
 
 @router.post("/update/run")
 async def run_vps_update(
-    admin_username: str = Depends(get_admin_from_token),
-    db: Session = Depends(get_db),
+    _: str = Depends(get_admin_from_token),
 ) -> Dict[str, Any]:
-    can_run_update, disabled_reason = update_service.can_run_vps_update()
-    if not can_run_update:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=disabled_reason or "VPS 在线更新不可用",
-        )
-
-    try:
-        result = update_service.start_vps_update()
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    write_admin_audit_log(
-        db,
-        admin_username,
-        "start_vps_update",
-        target_type="system_update",
-        detail={"message": result.get("message"), "command": result.get("command")},
+    _, disabled_reason = update_service.can_run_vps_update()
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=disabled_reason or "请 SSH 到 VPS 执行升级命令。",
     )
-    db.commit()
-    return result
 
 
 @router.get("/operations/status")

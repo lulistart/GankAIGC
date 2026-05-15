@@ -16,7 +16,7 @@
 | --- | --- | --- | --- | --- |
 | SEC-001 | 严重 | 已完成 | 未登录路径穿越，可读取 `package/static` 外的服务端文件 | `package/main.py` |
 | SEC-002 | 高危 | 已完成 | 用户可控模型 `base_url` 会造成后端 SSRF | `provider_config_service.py`、`optimization.py`、`ai_service.py`、`word_formatter/routes.py` |
-| SEC-003 | 高危 | 待修复 | Docker 在线更新挂载 Docker socket，并执行配置中的 shell 命令 | `docker-compose.yml`、`update_service.py`、`admin.py` |
+| SEC-003 | 高危 | 已完成 | Docker 在线更新挂载 Docker socket，并执行配置中的 shell 命令 | `docker-compose.yml`、`update_service.py`、`admin.py` |
 | SEC-004 | 高危 | 已完成 | 前端生产依赖存在已知安全公告 | `package/frontend/package.json`、`package-lock.json` |
 | SEC-005 | 高危/中危 | 已完成 | 后端依赖存在已知安全公告 | `package/backend/requirements.txt`、`package/requirements.txt` |
 | SEC-006 | 中危 | 已完成 | Word Formatter 上传接口先完整读入内存再检查大小，默认无限制 | `word_formatter/routes.py`、`config.py` |
@@ -92,18 +92,23 @@
 
 **风险说明：** app 容器挂载了 `/var/run/docker.sock`，并且后台可以触发 shell 命令控制 Docker。如果后台凭据或 JWT 密钥泄露，风险会扩大到宿主机 Docker 控制权。
 
-**修复思路：** 默认关闭在线更新能力，默认 app 服务不挂 Docker socket。更新应尽量作为显式运维流程，而不是普通 app 容器可触发的宿主机控制能力。
+**修复思路：** Docker 部署改为“后台检测更新 + 复制命令 + SSH 执行”。后台只显示当前版本、最新版本和升级命令，不再直接控制 Docker；默认 app 容器不挂 Docker socket，也不包含 Docker CLI/Compose 控制工具。
 
 **实施清单：**
 
-- [ ] 将 `package/backend/app/config.py` 中的 `VPS_UPDATE_ENABLED` 默认值改为 `False`。
-- [ ] 从 `docker-compose.yml` 默认 `app` 服务中移除 Docker socket 挂载。
-- [ ] 保留独立 `updater` profile，并在文档中明确说明启用它等于授予 Docker 控制能力。
-- [ ] 将 `update_service.start_vps_update` 中的 `subprocess.Popen(..., shell=True)` 改成固定 argv 命令，或在未显式配置时完全禁用直接命令执行。
-- [ ] 如果仍保留命令执行，只允许固定的 compose 更新命令，拒绝任意 `VPS_UPDATE_COMMAND`。
-- [ ] 确保 `/api/admin/update/run` 在未满足所有显式开启条件时返回清晰的禁用提示。
-- [ ] 更新 `docs/docker-deployment.md`，说明在线更新的安全边界和风险。
-- [ ] 运行 `cd package/backend; python -m pytest tests/test_admin_update_api.py tests/test_docker_compose.py -q`。
+- [x] 将 `package/backend/app/config.py` 中的 `VPS_UPDATE_ENABLED` 默认值改为 `False`。
+- [x] 从 `docker-compose.yml` 默认 `app` 服务中移除 Docker socket 挂载。
+- [x] 删除独立 `updater` profile，默认部署不再提供可由后台触发的宿主机 Docker 控制通道。
+- [x] `update_service.start_vps_update` 直接拒绝执行，不再调用 `subprocess.Popen` 或 shell。
+- [x] `/api/admin/update/status` 保留版本检测能力，并返回固定手动升级命令：
+  - `docker compose --env-file .env.docker pull`
+  - `docker compose --env-file .env.docker up -d`
+- [x] `/api/admin/update/run` 始终返回 `403`，提示管理员 SSH 到 VPS 执行升级命令。
+- [x] 从 Dockerfile 中移除 Docker CLI、Docker Compose plugin 和 `/app/source` safe.directory 配置。
+- [x] 前端后台更新弹窗移除“一键 VPS 在线更新”，改为“复制 SSH 升级命令”。
+- [x] `.env.docker.example` 默认关闭 `VPS_UPDATE_ENABLED`，删除 `VPS_UPDATE_COMMAND` 和 Docker socket 相关说明。
+- [x] CI 不再验证 `--profile update`。
+- [x] 运行 `cd package/backend; python -m pytest tests/test_admin_update_api.py tests/test_docker_compose.py tests/test_dockerfile.py tests/test_frontend_redeem_entry.py -q`。
 
 **完成标准：** 默认 Docker 部署中，app 容器不再拥有 Docker socket 控制权；在线更新无法被改造成任意 shell 命令执行。
 
@@ -266,3 +271,4 @@ npm run test:e2e
 | 2026-05-15 | SEC-002 本地模型代理兼容 | 已完成 | 增加 `ALLOW_LOCAL_MODEL_PROXY` 安全开关；仅本机绑定允许本地 HTTP 代理，公网绑定继续拒绝 |
 | 2026-05-15 | SEC-006 Word Formatter 上传 DoS | 已完成 | 分块读取上传并默认限制 20MB；聚焦测试已通过，8 passed；完整后端测试 `python -m pytest -q` 已通过，265 passed |
 | 2026-05-15 | SEC-008 Token 存储与浏览器安全加固 | 已完成 | 增加 CSP、点击劫持、MIME、来源和权限策略安全头；聚焦测试 `tests/test_security_headers.py -q` 已通过 |
+| 2026-05-15 | SEC-003 Docker 在线更新权限边界 | 已完成 | Docker 部署改为后台检测版本、复制 SSH 升级命令、管理员 SSH 到 VPS 执行；聚焦测试已通过，58 passed |

@@ -15,18 +15,13 @@ services:
       APP_ENV: production
       AUTO_OPEN_BROWSER: "false"
       GANKAIGC_ENV_FILE: /app/config/.env.docker
-      GANKAIGC_HOST_PROJECT_DIR: ${GANKAIGC_HOST_PROJECT_DIR:-${PWD:-.}}
       DATABASE_URL: postgresql://ai_polish:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.docker}@postgres:5432/ai_polish
       INLINE_TASK_WORKER_ENABLED: "false"
     command: python main.py
     volumes:
       - type: bind
-        source: ${GANKAIGC_HOST_PROJECT_DIR:-${PWD:-.}}/.env.docker
+        source: ./.env.docker
         target: /app/config/.env.docker
-      - type: bind
-        source: ${GANKAIGC_HOST_PROJECT_DIR:-${PWD:-.}}
-        target: /app/source
-      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "${APP_PORT:-9800}:9800"
     depends_on:
@@ -61,40 +56,6 @@ services:
     healthcheck:
       disable: true
     restart: unless-stopped
-
-  updater:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        DOCKER_IMAGE_PREFIX: ${DOCKER_IMAGE_PREFIX:-docker.m.daocloud.io/}
-    env_file:
-      - .env.docker
-    environment:
-      APP_ENV: production
-      AUTO_OPEN_BROWSER: "false"
-      GANKAIGC_ENV_FILE: /app/config/.env.docker
-      GANKAIGC_HOST_PROJECT_DIR: ${GANKAIGC_HOST_PROJECT_DIR:-${PWD:-.}}
-      DATABASE_URL: postgresql://ai_polish:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.docker}@postgres:5432/ai_polish
-      VPS_UPDATE_ENABLED: "true"
-      VPS_UPDATE_WORKDIR: /app/source
-      VPS_UPDATE_LOG_FILE: /app/source/logs/vps-update.log
-    working_dir: /app/source
-    command: >
-      sh -lc "git fetch --tags origin main &&
-      git pull --ff-only origin main &&
-      docker compose --env-file .env.docker up --build -d"
-    volumes:
-      - type: bind
-        source: ${GANKAIGC_HOST_PROJECT_DIR:-${PWD:-.}}/.env.docker
-        target: /app/config/.env.docker
-      - type: bind
-        source: ${GANKAIGC_HOST_PROJECT_DIR:-${PWD:-.}}
-        target: /app/source
-      - /var/run/docker.sock:/var/run/docker.sock
-    profiles:
-      - update
-    restart: "no"
 
   postgres:
     image: ${DOCKER_IMAGE_PREFIX:-docker.m.daocloud.io/}library/postgres:16-alpine

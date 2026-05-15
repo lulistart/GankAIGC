@@ -1,5 +1,4 @@
 ARG DOCKER_IMAGE_PREFIX=docker.m.daocloud.io/
-ARG DOCKER_COMPOSE_VERSION=v2.29.7
 
 FROM ${DOCKER_IMAGE_PREFIX}library/node:20-bookworm-slim AS frontend-builder
 
@@ -11,8 +10,6 @@ RUN npm run build
 
 FROM ${DOCKER_IMAGE_PREFIX}library/python:3.11-slim AS app
 
-ARG DOCKER_COMPOSE_VERSION
-
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
@@ -20,19 +17,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app/package
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git docker-cli \
-    && mkdir -p /app/config /usr/local/lib/docker/cli-plugins \
-    && arch="$(uname -m)" \
-    && case "$arch" in \
-        x86_64) compose_arch="x86_64" ;; \
-        aarch64|arm64) compose_arch="aarch64" ;; \
-        *) echo "unsupported architecture for Docker Compose: $arch" >&2; exit 1 ;; \
-    esac \
-    && curl -fsSL "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-${compose_arch}" \
-        -o /usr/local/lib/docker/cli-plugins/docker-compose \
-    && chmod +x /usr/local/lib/docker/cli-plugins/docker-compose \
-    && git config --system --add safe.directory /app/source \
-    && docker compose version \
+    && apt-get install -y --no-install-recommends ca-certificates curl git \
+    && mkdir -p /app/config \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package/requirements.txt ./

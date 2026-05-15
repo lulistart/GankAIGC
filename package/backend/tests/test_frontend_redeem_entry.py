@@ -213,9 +213,11 @@ def test_admin_update_modal_uses_source_and_release_latest_state():
     assert "const updateAvailable" in admin_dashboard
     assert "const updateStatusLabel" in admin_dashboard
     assert "已是最新版本" in admin_dashboard
-    assert "VPS 在线更新" in admin_dashboard
-    assert "DownloadCloud className" in admin_dashboard
-    assert "can_run_update && updateAvailable" in admin_dashboard
+    assert "复制 SSH 升级命令" in admin_dashboard
+    assert "VPS 在线更新" not in admin_dashboard
+    assert "确认开始 VPS 在线更新" not in admin_dashboard
+    assert "handleRunVpsUpdate" not in admin_dashboard
+    assert "can_run_update && updateAvailable" not in admin_dashboard
 
 
 def test_spa_index_injects_runtime_version_before_react_bootstrap():

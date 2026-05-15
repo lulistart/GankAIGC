@@ -169,8 +169,6 @@ const AdminDashboard = () => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateStatus, setUpdateStatus] = useState(null);
   const [loadingUpdateStatus, setLoadingUpdateStatus] = useState(false);
-  const [runningUpdate, setRunningUpdate] = useState(false);
-  const [confirmingVpsUpdate, setConfirmingVpsUpdate] = useState(false);
 
   useEffect(() => {
     if (adminToken) {
@@ -314,24 +312,7 @@ const AdminDashboard = () => {
 
   const openUpdateModal = () => {
     setShowUpdateModal(true);
-    setConfirmingVpsUpdate(false);
     fetchUpdateStatus();
-  };
-
-  const handleRunVpsUpdate = async () => {
-    setRunningUpdate(true);
-    try {
-      const response = await axios.post('/api/admin/update/run', {}, {
-        headers: { Authorization: `Bearer ${adminToken}` }
-      });
-      toast.success(response.data?.message || '更新任务已启动');
-      setConfirmingVpsUpdate(false);
-      setUpdateStatus((current) => current ? { ...current, last_run: response.data } : current);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || '启动在线更新失败');
-    } finally {
-      setRunningUpdate(false);
-    }
   };
 
   const fetchAccountData = async () => {
@@ -877,7 +858,9 @@ const AdminDashboard = () => {
   const updateAvailable = Boolean(
     updateStatus?.release_update_available || updateStatus?.source_update_available
   );
-  const updateStatusLabel = updateAvailable ? '可一键更新' : '已是最新版本';
+  const updateStatusLabel = updateAvailable ? '可手动升级' : '已是最新版本';
+  const manualUpdateCommand = updateStatus?.setup_command
+    || 'docker compose --env-file .env.docker pull\ndocker compose --env-file .env.docker up -d';
 
   // Admin Dashboard
   return (
@@ -892,7 +875,7 @@ const AdminDashboard = () => {
               <button
                 onClick={openUpdateModal}
                 className="inline-flex items-center gap-2 rounded-xl bg-white/80 px-3 py-1.5 text-sm font-semibold text-slate-700 border border-white/70 shadow-sm hover:bg-white transition-colors"
-                title="查看版本和 VPS 在线更新"
+                title="查看版本和 SSH 升级命令"
               >
                 {updateStatus?.current_version || CURRENT_APP_VERSION}
                 <RefreshCw className="w-4 h-4 text-slate-400" />
@@ -1898,8 +1881,8 @@ const AdminDashboard = () => {
                   <DownloadCloud className="h-5 w-5 text-indigo-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">在线更新</h3>
-                  <p className="text-xs text-slate-500">仅用于 VPS / Docker 部署</p>
+                  <h3 className="text-lg font-semibold text-slate-900">版本更新</h3>
+                  <p className="text-xs text-slate-500">检测版本后，复制命令到 VPS SSH 执行</p>
                 </div>
               </div>
               <button
@@ -1960,26 +1943,18 @@ const AdminDashboard = () => {
                         </p>
                       </div>
                       <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                        updateStatus?.can_run_update && updateAvailable
+                        updateAvailable
                           ? 'bg-emerald-100 text-emerald-700'
-                          : updateStatus?.can_run_update
-                            ? 'bg-slate-100 text-slate-600'
-                            : 'bg-slate-100 text-slate-600'
+                          : 'bg-slate-100 text-slate-600'
                       }`}>
-                        {updateStatus?.can_run_update ? updateStatusLabel : '未开启'}
+                        {updateStatusLabel}
                       </span>
                     </div>
                   </div>
 
-                  {!updateStatus?.can_run_update && updateStatus?.disabled_reason && (
+                  {updateStatus?.disabled_reason && (
                     <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
                       {updateStatus.disabled_reason}
-                    </div>
-                  )}
-
-                  {updateStatus?.last_run && (
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                      {updateStatus.last_run.message}
                     </div>
                   )}
 
@@ -2006,47 +1981,13 @@ const AdminDashboard = () => {
 
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <button
-                      onClick={() => copyToClipboard(updateStatus?.setup_command || 'docker compose --env-file .env.docker up --build -d app worker')}
+                      onClick={() => copyToClipboard(manualUpdateCommand)}
                       className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
                       <Copy className="h-4 w-4" />
-                      复制升级命令
-                    </button>
-                    <button
-                      onClick={() => setConfirmingVpsUpdate(true)}
-                      disabled={!updateStatus?.can_run_update || !updateAvailable || runningUpdate}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-slate-300"
-                    >
-                      {runningUpdate ? <Loader2 className="h-4 w-4 animate-spin" /> : <DownloadCloud className="h-4 w-4" />}
-                      VPS 在线更新
+                      复制 SSH 升级命令
                     </button>
                   </div>
-
-                  {confirmingVpsUpdate && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                      <p className="text-sm font-semibold text-amber-900">确认开始 VPS 在线更新？</p>
-                      <p className="mt-1 text-xs leading-5 text-amber-800">
-                        服务会拉取 GitHub 最新代码并重建 app / worker 容器，期间可能短暂不可用。
-                      </p>
-                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                        <button
-                          onClick={handleRunVpsUpdate}
-                          disabled={runningUpdate}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:bg-amber-300"
-                        >
-                          {runningUpdate && <Loader2 className="h-4 w-4 animate-spin" />}
-                          确认更新
-                        </button>
-                        <button
-                          onClick={() => setConfirmingVpsUpdate(false)}
-                          disabled={runningUpdate}
-                          className="inline-flex flex-1 items-center justify-center rounded-lg border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-                        >
-                          取消
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </>
               )}
             </div>

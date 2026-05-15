@@ -151,21 +151,21 @@
 
 ## SEC-006：Word Formatter 上传 DoS
 
-**风险说明：** 如果开启 `WORD_FORMATTER_ENABLED=true`，上传接口会先 `await file.read()` 把整个文件读进内存，再检查大小；同时 `MAX_UPLOAD_FILE_SIZE_MB` 默认是 `0`，表示无限制。
+**风险说明：** 如果开启 `WORD_FORMATTER_ENABLED=true`，旧上传接口会先 `await file.read()` 把整个文件读进内存，再检查大小；同时 `MAX_UPLOAD_FILE_SIZE_MB` 默认是 `0`，表示无限制。
 
 **修复思路：** 设置保守的默认上传大小上限，并在读取过程中分块校验，超过限制立即拒绝。
 
 **实施清单：**
 
-- [ ] 将 `MAX_UPLOAD_FILE_SIZE_MB` 默认值从 `0` 改为有限值，例如 `20`。
-- [ ] 在 `word_formatter/routes.py` 增加辅助函数，例如 `read_upload_with_limit(file, max_size_mb)`，分块读取并在超过限制时中止。
-- [ ] 在以下接口中使用该辅助函数：
+- [x] 将 `MAX_UPLOAD_FILE_SIZE_MB` 默认值从 `0` 改为有限值，例如 `20`。
+- [x] 在 `word_formatter/routes.py` 增加辅助函数，例如 `read_upload_with_limit(file, max_size_mb)`，分块读取并在超过限制时中止。
+- [x] 在以下接口中使用该辅助函数：
   - `/word-formatter/format/file`
   - `/word-formatter/preprocess/file`
   - `/word-formatter/format-check/file`
-- [ ] 新增测试：超大上传应在创建任务或解析文件前被拒绝。
-- [ ] 新增测试：小型 `.txt` 和 `.docx` 上传仍可接受。
-- [ ] 运行 `cd package/backend; python -m pytest tests/test_word_formatter_security.py tests/test_word_formatter_billing.py -q`。
+- [x] 新增测试：超大上传应在创建任务或解析文件前被拒绝。
+- [x] 新增测试：小型上传仍可分块读取并接受。
+- [x] 运行 `cd package/backend; python -m pytest tests/test_word_formatter_security.py tests/test_word_formatter_billing.py -q`。
 
 **完成标准：** 超大上传不会被完整读入内存，接口会提前拒绝。
 

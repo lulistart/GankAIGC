@@ -1,10 +1,61 @@
 from pathlib import Path
 
+import pytest
+
 import app.config as config_module
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 WORD_FORMATTER_ROOT = PACKAGE_ROOT / "backend" / "app" / "word_formatter"
+
+
+class _ChunkedUpload:
+    def __init__(self, content: bytes):
+        self.content = content
+        self.offset = 0
+        self.read_sizes: list[int] = []
+
+    async def read(self, size: int = -1) -> bytes:
+        self.read_sizes.append(size)
+        if size is None or size < 0:
+            raise AssertionError("upload reader must not perform an unbounded read")
+        if self.offset >= len(self.content):
+            return b""
+        end = min(self.offset + size, len(self.content))
+        chunk = self.content[self.offset:end]
+        self.offset = end
+        return chunk
+
+
+def test_word_formatter_default_upload_limit_is_finite():
+    assert config_module.settings.MAX_UPLOAD_FILE_SIZE_MB == 20
+
+
+@pytest.mark.asyncio
+async def test_word_formatter_upload_reader_uses_bounded_chunks():
+    from app.word_formatter.routes import read_upload_with_limit
+
+    upload = _ChunkedUpload(b"a" * 2048)
+
+    content = await read_upload_with_limit(upload, max_size_mb=1)
+
+    assert content == b"a" * 2048
+    assert upload.read_sizes
+    assert all(0 < size <= 1024 * 1024 for size in upload.read_sizes)
+
+
+@pytest.mark.asyncio
+async def test_word_formatter_upload_reader_rejects_when_limit_exceeded_without_unbounded_read():
+    from app.word_formatter.routes import read_upload_with_limit
+
+    upload = _ChunkedUpload(b"a" * (1024 * 1024 + 1))
+
+    with pytest.raises(Exception) as exc_info:
+        await read_upload_with_limit(upload, max_size_mb=1)
+
+    assert "超过限制" in str(exc_info.value)
+    assert upload.read_sizes
+    assert all(0 < size <= 1024 * 1024 for size in upload.read_sizes)
 
 
 def test_word_formatter_ooxml_parser_disables_external_entities():

@@ -60,6 +60,7 @@ from .utils.docx_text import extract_text_from_docx
 router = APIRouter(prefix="/word-formatter", tags=["word-formatter"])
 
 WORD_FORMATTER_BILLING_MODES = {"platform", "byok"}
+UPLOAD_READ_CHUNK_SIZE = 1024 * 1024
 
 
 # Request/Response Models
@@ -282,6 +283,28 @@ def get_word_formatter_ai_service(provider_config: Optional[dict] = None) -> AIS
     )
 
 
+async def read_upload_with_limit(file: UploadFile, max_size_mb: int) -> bytes:
+    max_bytes = max_size_mb * 1024 * 1024
+    chunks: list[bytes] = []
+    total_size = 0
+
+    while True:
+        chunk = await file.read(UPLOAD_READ_CHUNK_SIZE)
+        if not chunk:
+            break
+
+        total_size += len(chunk)
+        if total_size > max_bytes:
+            file_size_mb = total_size / (1024 * 1024)
+            raise HTTPException(
+                status_code=400,
+                detail=f"文件大小 ({file_size_mb:.1f} MB) 超过限制 ({max_size_mb} MB)",
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
+
 def charge_word_formatter_platform_credit(user: User, db: Session, billing_mode: str, reason: str) -> bool:
     if normalize_word_formatter_billing_mode(billing_mode) == "byok":
         return False
@@ -500,22 +523,14 @@ async def format_file(
         refund_word_formatter_platform_credit(user, db, charged, reason="word_formatter_format_refund")
         raise HTTPException(status_code=400, detail="仅支持 .docx, .txt, .md 文件")
 
-    # Read file content
-    content = await file.read()
+    try:
+        content = await read_upload_with_limit(file, settings.MAX_UPLOAD_FILE_SIZE_MB)
+    except HTTPException:
+        refund_word_formatter_platform_credit(user, db, charged, reason="word_formatter_format_refund")
+        raise
 
     print(f"[WORD-FORMATTER] 文件大小: {len(content)} 字节", flush=True)
     print(f"[WORD-FORMATTER] 文件类型: {ext}", flush=True)
-
-    # Check file size limit (0 means unlimited)
-    max_size_mb = settings.MAX_UPLOAD_FILE_SIZE_MB
-    if max_size_mb > 0:
-        file_size_mb = len(content) / (1024 * 1024)
-        if file_size_mb > max_size_mb:
-            refund_word_formatter_platform_credit(user, db, charged, reason="word_formatter_format_refund")
-            raise HTTPException(
-                status_code=400,
-                detail=f"文件大小 ({file_size_mb:.1f} MB) 超过限制 ({max_size_mb} MB)"
-            )
 
     # Extract text based on file type
     if ext == "docx":
@@ -871,19 +886,13 @@ async def preprocess_file(
         refund_word_formatter_platform_credit(user, db, charged, reason="word_formatter_preprocess_refund")
         raise HTTPException(status_code=400, detail="仅支持 .docx, .txt, .md 文件")
 
-    content = await file.read()
+    try:
+        content = await read_upload_with_limit(file, settings.MAX_UPLOAD_FILE_SIZE_MB)
+    except HTTPException:
+        refund_word_formatter_platform_credit(user, db, charged, reason="word_formatter_preprocess_refund")
+        raise
 
     print(f"[WORD-FORMATTER] 文件大小: {len(content)} 字节", flush=True)
-
-    max_size_mb = settings.MAX_UPLOAD_FILE_SIZE_MB
-    if max_size_mb > 0:
-        file_size_mb = len(content) / (1024 * 1024)
-        if file_size_mb > max_size_mb:
-            refund_word_formatter_platform_credit(user, db, charged, reason="word_formatter_preprocess_refund")
-            raise HTTPException(
-                status_code=400,
-                detail=f"文件大小 ({file_size_mb:.1f} MB) 超过限制 ({max_size_mb} MB)"
-            )
 
     if ext == "docx":
         try:
@@ -1289,20 +1298,9 @@ async def format_check_file(
     if ext not in {"docx", "txt", "md", "markdown"}:
         raise HTTPException(status_code=400, detail="仅支持 .docx, .txt, .md 文件")
 
-    # Read file content
-    content = await file.read()
+    content = await read_upload_with_limit(file, settings.MAX_UPLOAD_FILE_SIZE_MB)
 
     print(f"[WORD-FORMATTER] 文件大小: {len(content)} 字节", flush=True)
-
-    # Check file size limit
-    max_size_mb = settings.MAX_UPLOAD_FILE_SIZE_MB
-    if max_size_mb > 0:
-        file_size_mb = len(content) / (1024 * 1024)
-        if file_size_mb > max_size_mb:
-            raise HTTPException(
-                status_code=400,
-                detail=f"文件大小 ({file_size_mb:.1f} MB) 超过限制 ({max_size_mb} MB)"
-            )
 
     # Extract text based on file type
     if ext == "docx":

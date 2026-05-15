@@ -123,8 +123,8 @@ class Settings(BaseSettings):
 
     # 实验性 Word Formatter 默认关闭，开启后才注册后端路由
     WORD_FORMATTER_ENABLED: bool = False
-    # Word Formatter 文件上传限制 (MB)，0 表示无限制
-    MAX_UPLOAD_FILE_SIZE_MB: int = 0
+    # Word Formatter 文件上传限制 (MB)
+    MAX_UPLOAD_FILE_SIZE_MB: int = 20
     
     # 会话压缩配置
     HISTORY_COMPRESSION_THRESHOLD: int = 5000  # 汉字数量阈值

@@ -2,7 +2,9 @@
 
 本目录包含将前后端项目打包为普通可执行文件和 Windows 一键整合包的代码与配置。
 
-当前稳定主线是「账号注册 + 用户登录 + 邀请码注册 + 兑换码充值啤酒 + 啤酒流水 + 降 AI 工作台」。Word 排版相关后端代码仍作为实验模块保留，但默认关闭，前端不暴露排版入口。
+当前稳定主线是「账号注册 + 用户登录 + 邀请码注册 + 兑换码充值啤酒 + 啤酒流水 + 降 AI 工作台 + 后台运维状态」。Word 排版相关后端代码仍作为实验模块保留，但默认关闭，前端不暴露排版入口。
+
+当前应用版本写在 `VERSION`，后台左上角版本号和 Docker 镜像内版本显示都会读取这个文件。
 
 ## 目录结构
 
@@ -10,7 +12,9 @@
 package/
 ├── backend/           # 后端代码（修改版，支持 exe 模式）
 ├── frontend/          # 前端代码（修改版，生产环境配置）
+├── static/            # 前端生产构建产物，python main.py 和 exe 会读取这里
 ├── main.py            # 统一入口文件
+├── VERSION            # 应用版本号
 ├── app.spec           # PyInstaller 打包配置
 ├── requirements.txt   # Python 依赖
 ├── build.sh           # Linux/macOS 构建脚本
@@ -21,6 +25,9 @@ package/
 ```
 
 ## 本地构建
+
+<details>
+<summary><strong>展开查看普通 exe 和一键包构建命令</strong></summary>
 
 ### 前置条件
 
@@ -58,6 +65,24 @@ cd package
 
 一键包位于 `dist/GankAIGC-Windows/`，压缩包位于 `dist/GankAIGC-Windows-OneClick.zip`。
 
+</details>
+
+### 前端生产静态包
+
+修改 `frontend/src/` 后，需要重新构建并同步到 `static/`，否则 `python main.py`、Docker 和 exe 仍会使用旧页面：
+
+```powershell
+cd package/frontend
+npm ci
+npm run build
+cd ../..
+robocopy package\frontend\dist package\static /MIR
+git add package/frontend
+git add -f package/static
+```
+
+`package/static` 被 `.gitignore` 忽略，提交生产包时需要 `git add -f package/static`。
+
 ## 发布方式
 
 当前公开 Release 主要发布 Windows 一键整合包：
@@ -76,7 +101,7 @@ cd package
 然后用 GitHub CLI 覆盖 Release 附件：
 
 ```powershell
-gh release upload v1.0.0 .\dist\GankAIGC-Windows-OneClick.zip --clobber
+gh release upload v1.0.7 .\dist\GankAIGC-Windows-OneClick.zip --clobber
 ```
 
 GitHub Actions 工作流会在推送 `v*` 标签时构建普通 Windows/Linux/macOS 可执行文件；当前公开 Release 仍优先使用本地构建并上传的 Windows 一键整合包。
@@ -84,9 +109,15 @@ GitHub Actions 工作流会在推送 `v*` 标签时构建普通 Windows/Linux/ma
 ### 标签发布
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag -a v1.0.7 -m "GankAIGC v1.0.7"
+git push origin v1.0.7
 ```
+
+发布新版本时同时更新：
+
+- `VERSION`
+- `backend/app/config.py` 中的 `DEFAULT_APP_VERSION`
+- 根目录 README 的使用说明，如部署或后台行为有变化
 
 ### 常见构建产物
 
@@ -119,6 +150,16 @@ Windows 一键整合包：
 
 源码运行时降 AI 任务会先进入 PostgreSQL 队列。exe / `python main.py` 默认启用 inline worker；Docker 部署则由独立 worker 服务消费队列。worker 会定期刷新心跳，长时间无心跳的处理中任务会自动恢复为排队状态。
 
+Docker 部署默认还会启动 `backup` 服务，每天自动备份 PostgreSQL 到宿主机 `backups/`。后台「运维状态」可以查看数据库、worker、备份、版本更新和初始化检查。
+
+Docker 更新采用手动 SSH 模式：后台只检测 GitHub Release 并提供复制命令，不直接控制 Docker，也不挂载 Docker socket。VPS 上升级通常执行：
+
+```bash
+git fetch --tags origin main
+git pull --ff-only origin main
+docker compose --env-file .env.docker up -d --build
+```
+
 ### 访问地址
 
 - 用户界面: http://localhost:9800
@@ -136,10 +177,12 @@ Windows 一键整合包：
 ### 前端修改
 - 修改 `vite.config.js` 添加生产环境构建配置
 - 修改 API 配置，生产环境直接使用根路径
+- 后台用户管理分为用户列表、邀请码管理、兑换码、啤酒流水和 API 配置；用户列表支持搜索、状态筛选、API 配置筛选、封禁/启用、充值和无限啤酒。
 
 ### 后端修改
 - 修改 `config.py`，支持动态获取 exe 目录下的配置文件
 - 数据库统一使用 PostgreSQL
+- 增加浏览器安全响应头、模型 Base URL 安全校验、Docker 手动升级边界和 PostgreSQL 备份状态读取。
 
 ### 统一入口
 - `main.py` 创建 FastAPI 应用

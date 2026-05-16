@@ -116,11 +116,13 @@ GankAIGC/
 
 ## 🚀 运行与部署
 
-当前按 3 种方式说明，均可使用：
+按使用场景选择一种方式：
 
-1. **`python main.py` 源码运行**：适合本机开发、调试和自己使用。
-2. **Docker Compose 部署**：适合本机 Docker、VPS 和正式上线，自动包含 PostgreSQL。
-3. **Windows 一键整合包**：适合 Windows 新手，Release 下载后解压即用，内置便携 PostgreSQL。
+| 方式 | 适合场景 | 一句话说明 |
+| ---- | -------- | ---------- |
+| `python main.py` 源码运行 | 本机开发、调试、个人使用 | 需要 Python 和 PostgreSQL，可用 Docker 只启动数据库 |
+| Docker Compose 部署 | 本机 Docker、VPS、正式上线 | 一次启动 Web、worker、PostgreSQL 和自动备份 |
+| Windows 一键整合包 | Windows 新手直接使用 | Release 下载后解压，双击 `start.bat`，内置便携 PostgreSQL |
 
 Windows 用户如果只想直接使用，优先下载：
 
@@ -134,9 +136,8 @@ https://github.com/mumu-0922/GankAIGC/releases/latest
 - 🛠 管理后台：<http://localhost:9800/admin>
 - 📖 API 文档：<http://localhost:9800/docs>
 
----
-
-### 1. `python main.py` 源码运行（详细步骤）
+<details>
+<summary><strong>1. 源码运行：python main.py</strong></summary>
 
 这种方式需要 **Python + PostgreSQL**。如果不想手动安装 PostgreSQL，推荐用 Docker 只启动数据库，项目本体仍用 `python main.py` 跑。
 
@@ -268,9 +269,10 @@ python main.py
 http://localhost:9800
 ```
 
----
+</details>
 
-### 2. Docker Compose 部署
+<details>
+<summary><strong>2. Docker Compose 部署</strong></summary>
 
 Docker Compose 会一次启动完整服务：
 
@@ -416,9 +418,10 @@ docker compose --env-file .env.docker up -d --build
 
 > 不要随便执行 `docker compose down -v`、`docker volume rm gankaigc_postgres_data`。这些命令会删除 PostgreSQL 数据卷，用户、邀请码、兑换码、会话和啤酒流水都会丢失。
 
----
+</details>
 
-### 3. Windows 一键整合包
+<details>
+<summary><strong>3. Windows 一键整合包</strong></summary>
 
 解压后双击 `start.bat` 即可运行。
 
@@ -442,7 +445,7 @@ GankAIGC-Windows-OneClick.zip
 
 > 注意：不要删除 `data/`，否则用户、邀请码、兑换码、会话等数据会丢失。
 
-
+</details>
 
 ---
 
@@ -450,7 +453,10 @@ GankAIGC-Windows-OneClick.zip
 
 源码运行读取 `package/.env`；打包后的 exe 读取 exe 同目录 `.env`；Docker 读取 `.env.docker`。
 
-项目 **只支持 PostgreSQL**。核心配置示例：
+项目 **只支持 PostgreSQL**。核心配置示例见下方。
+
+<details>
+<summary><strong>展开查看核心配置示例</strong></summary>
 
 ```properties
 SERVER_HOST=0.0.0.0
@@ -492,6 +498,8 @@ ADMIN_DATABASE_WRITE_ENABLED=false
 - `ADMIN_DATABASE_WRITE_ENABLED=false`：数据库管理器保持只读，生产环境建议保持关闭。
 - `ENCRYPTION_KEY`：用于加密用户保存的自带 API 配置，必须妥善保存。
 
+</details>
+
 ---
 
 ## 🧭 使用流程
@@ -521,17 +529,30 @@ http://localhost:9800/admin
 
 - 📊 **数据面板**：用户、任务、完成率、模式统计等。
 - ⏳ **会话监控**：排队、处理中、历史任务。
-- 👥 **用户管理**：用户、邀请码、兑换码、啤酒流水、自带 API 摘要、封禁/解封。
-- 📨 **邀请码管理**：支持单个创建、批量生成 `10/50/100`、多选复制、CSV/TXT 导出。
-- 🍺 **兑换码管理**：支持单个创建、批量生成 `10/50/100`、多选复制、CSV/TXT 导出。
+- 🛡 **运维状态**：检查数据库、worker、自动备份、版本更新、初始化事项和模型连接。
+- 👥 **用户管理**：新版后台分为用户列表、邀请码管理、兑换码、啤酒流水、API 配置。
 - 📢 **公告管理**：发布、启用/隐藏、删除公告，用户工作台展示启用中的公告。
 - 🧾 **操作日志**：记录创建邀请码、创建兑换码、充值啤酒、公告、封禁/解封、配置变更。
 - 🗄 **数据库管理**：默认只读，白名单表可查，敏感字段脱敏。
 - ⚙️ **系统配置**：模型、Base URL、并发、请求间隔、思考模式等。
 
+<details>
+<summary><strong>展开查看用户管理细节</strong></summary>
+
+用户管理内部分为 5 个工作区：
+
+- **用户列表**：按 ID、用户名、昵称搜索，按状态和 API 配置筛选；支持封禁/启用、充值啤酒、设置/取消无限啤酒。
+- **邀请码管理**：支持单个创建、批量生成 `10/50/100`、多选复制、CSV/TXT 导出和停用/启用。
+- **兑换码**：支持单个创建、批量生成 `10/50/100`、多选复制、CSV/TXT 导出。
+- **啤酒流水**：查看充值、兑换、降 AI 消耗和失败退款记录。
+- **API 配置**：只展示用户自带 API 的 Base URL、模型名和 API Key 后四位，不展示完整密钥。
+
+</details>
+
 ---
 
-## 🗄 数据库迁移、备份与恢复
+<details>
+<summary><strong>🗄 数据库迁移、备份与恢复</strong></summary>
 
 ### 数据库迁移
 
@@ -565,9 +586,10 @@ docker exec gankaigc-postgres rm "/tmp/$file"
 
 备份、恢复和换机器说明见：[PostgreSQL 运维指南](docs/postgresql-operations.md)。
 
----
+</details>
 
-## ❓ 常见问题
+<details>
+<summary><strong>❓ 常见问题</strong></summary>
 
 ### 端口被占用怎么办？
 
@@ -590,7 +612,7 @@ docker exec gankaigc-postgres rm "/tmp/$file"
 
 检查 API Key、Base URL、模型名称和网络连通性。不要把真实 API Key 提交到仓库。
 
----
+</details>
 
 ## 🔐 安全提醒
 
@@ -602,6 +624,8 @@ docker exec gankaigc-postgres rm "/tmp/$file"
 - 设置有效的 `ENCRYPTION_KEY`。
 - 备份 PostgreSQL 数据库。
 - 不要提交 `.env`、`.env.docker`、数据库 dump、日志和真实 API Key。
+- 保持默认浏览器安全响应头开启，包括 CSP、点击劫持防护、MIME 嗅探防护、来源策略和权限策略。
+- 公网或 VPS 部署不要开启本地 HTTP 模型代理，模型 Base URL 使用公网 HTTPS 地址。
 
 ---
 

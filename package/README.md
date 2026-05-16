@@ -101,7 +101,7 @@ cd package
 然后用 GitHub CLI 覆盖 Release 附件：
 
 ```powershell
-gh release upload v1.0.7 .\dist\GankAIGC-Windows-OneClick.zip --clobber
+gh release upload v1.0.8 .\dist\GankAIGC-Windows-OneClick.zip --clobber
 ```
 
 GitHub Actions 工作流会在推送 `v*` 标签时构建普通 Windows/Linux/macOS 可执行文件；当前公开 Release 仍优先使用本地构建并上传的 Windows 一键整合包。
@@ -109,8 +109,8 @@ GitHub Actions 工作流会在推送 `v*` 标签时构建普通 Windows/Linux/ma
 ### 标签发布
 
 ```bash
-git tag -a v1.0.7 -m "GankAIGC v1.0.7"
-git push origin v1.0.7
+git tag -a v1.0.8 -m "GankAIGC v1.0.8"
+git push origin v1.0.8
 ```
 
 发布新版本时同时更新：

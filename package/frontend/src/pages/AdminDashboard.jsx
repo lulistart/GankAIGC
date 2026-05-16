@@ -7,6 +7,7 @@ import {
   LogOut,
   Users,
   Key,
+  Search,
   CheckCircle,
   Shield,
   Plus,
@@ -47,6 +48,13 @@ const ADMIN_COMPACT_TABLE_SCROLL_CLASS = 'overflow-auto max-h-[20rem]';
 const ADMIN_TABLE_SCROLL_CLASS = 'overflow-auto max-h-[37rem]';
 const ADMIN_COMPACT_TABLE_HEAD_CLASS = 'sticky top-0 z-10 bg-white';
 const ADMIN_TABLE_HEAD_CLASS = 'sticky top-0 z-10 bg-gray-50';
+const ACCOUNT_PANEL_TABS = [
+  { id: 'users', label: '用户列表' },
+  { id: 'invites', label: '邀请码管理' },
+  { id: 'creditCodes', label: '兑换码' },
+  { id: 'creditTransactions', label: '啤酒流水' },
+  { id: 'apiConfigs', label: 'API 配置' },
+];
 const CURRENT_APP_VERSION = window.__GANKAIGC_RUNTIME__?.appVersion || import.meta.env.VITE_APP_VERSION || 'v1.0.7';
 
 const formatAdminNumber = (value) => Number(value || 0).toLocaleString();
@@ -161,6 +169,10 @@ const AdminDashboard = () => {
   const [creatingCreditBatch, setCreatingCreditBatch] = useState(false);
   const [selectedInviteIds, setSelectedInviteIds] = useState([]);
   const [selectedCreditCodeIds, setSelectedCreditCodeIds] = useState([]);
+  const [accountPanelTab, setAccountPanelTab] = useState('users');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState('all');
+  const [userApiFilter, setUserApiFilter] = useState('all');
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementContent, setAnnouncementContent] = useState('');
   const [announcementCategory, setAnnouncementCategory] = useState('notice');
@@ -477,6 +489,31 @@ const AdminDashboard = () => {
 
   const selectedInvites = invites.filter((invite) => selectedInviteIds.includes(invite.id));
   const selectedCreditCodes = creditCodes.filter((code) => selectedCreditCodeIds.includes(code.id));
+  const providerConfigByUserId = new Map(providerConfigs.map((config) => [config.user_id, config]));
+  const usedInviteByUserId = new Map(
+    invites
+      .filter((invite) => invite.used_by_user_id)
+      .map((invite) => [invite.used_by_user_id, invite])
+  );
+  const normalizedUserSearchTerm = userSearchTerm.trim().toLowerCase();
+  const filteredUsers = users.filter((user) => {
+    const providerConfig = providerConfigByUserId.get(user.id);
+    const matchesSearch = !normalizedUserSearchTerm || [
+      user.id,
+      user.username,
+      user.nickname,
+    ].some((value) => String(value ?? '').toLowerCase().includes(normalizedUserSearchTerm));
+    const matchesStatus = userStatusFilter === 'all'
+      || (userStatusFilter === 'active' && user.is_active)
+      || (userStatusFilter === 'blocked' && !user.is_active);
+    const matchesApi = userApiFilter === 'all'
+      || (userApiFilter === 'configured' && providerConfig)
+      || (userApiFilter === 'empty' && !providerConfig);
+
+    return matchesSearch && matchesStatus && matchesApi;
+  });
+  const activeUserCount = users.filter((user) => user.is_active).length;
+  const blockedUserCount = users.length - activeUserCount;
 
   const toggleInviteSelection = (inviteId) => {
     setSelectedInviteIds((current) => (
@@ -867,7 +904,7 @@ const AdminDashboard = () => {
     <div className="gank-app-page">
       {/* Header */}
       <div className="gank-glass-toolbar sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="mx-auto max-w-[96rem] px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <BrandLogo size="sm" />
@@ -892,7 +929,7 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+      <div className="mx-auto max-w-[96rem] px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6 items-start">
           <aside
             data-admin-nav="sidebar"
@@ -1122,7 +1159,27 @@ const AdminDashboard = () => {
               </button>
             </div>
 
+            <div className="overflow-x-auto rounded-2xl border border-white/70 bg-white/85 p-1 shadow-ios">
+              <div className="flex min-w-max gap-1">
+                {ACCOUNT_PANEL_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setAccountPanelTab(tab.id)}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                      accountPanelTab === tab.id
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-6">
+              {accountPanelTab === 'invites' && (
               <div className="bg-white rounded-2xl shadow-ios p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
@@ -1296,7 +1353,9 @@ const AdminDashboard = () => {
                   </table>
                 </div>
               </div>
+              )}
 
+              {accountPanelTab === 'creditCodes' && (
               <div className="bg-white rounded-2xl shadow-ios p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
@@ -1450,99 +1509,191 @@ const AdminDashboard = () => {
                   </table>
                 </div>
               </div>
+              )}
             </div>
 
+            {accountPanelTab === 'users' && (
             <div className="bg-white rounded-2xl shadow-ios overflow-hidden">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">用户啤酒余额</h3>
-                  <p className="text-xs text-gray-500 mt-1">管理员可给平台模式充值啤酒，或给账号开启无限啤酒</p>
+              <div className="border-b border-gray-200 p-4 sm:p-5">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="grid grid-cols-3 gap-3 sm:min-w-[22rem]">
+                    <div className="rounded-xl bg-gray-50 px-3 py-2">
+                      <div className="text-xs font-medium text-gray-500">总用户</div>
+                      <div className="text-lg font-bold text-gray-900">{users.length}</div>
+                    </div>
+                    <div className="rounded-xl bg-emerald-50 px-3 py-2">
+                      <div className="text-xs font-medium text-emerald-700">正常</div>
+                      <div className="text-lg font-bold text-emerald-900">{activeUserCount}</div>
+                    </div>
+                    <div className="rounded-xl bg-red-50 px-3 py-2">
+                      <div className="text-xs font-medium text-red-700">封禁</div>
+                      <div className="text-lg font-bold text-red-900">{blockedUserCount}</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
+                    <label className="relative flex-1 lg:max-w-xs">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="search"
+                        value={userSearchTerm}
+                        onChange={(e) => setUserSearchTerm(e.target.value)}
+                        placeholder="搜索 ID、用户名、昵称"
+                        className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-9 pr-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </label>
+                    <select
+                      value={userStatusFilter}
+                      onChange={(e) => setUserStatusFilter(e.target.value)}
+                      className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    >
+                      <option value="all">全部状态</option>
+                      <option value="active">正常用户</option>
+                      <option value="blocked">已封禁</option>
+                    </select>
+                    <select
+                      value={userApiFilter}
+                      onChange={(e) => setUserApiFilter(e.target.value)}
+                      className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    >
+                      <option value="all">全部 API</option>
+                      <option value="configured">已配置 API</option>
+                      <option value="empty">未配置 API</option>
+                    </select>
+                  </div>
                 </div>
-                {loadingAccountData && <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />}
               </div>
               <div className={ADMIN_TABLE_SCROLL_CLASS}>
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-[1180px] divide-y divide-gray-200">
                   <thead className={ADMIN_TABLE_HEAD_CLASS}>
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">啤酒余额</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">权限</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">登录/使用</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">充值</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户名</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">啤酒</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">API 配置</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">邀请信息</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">注册时间</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后登录</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {users.map((user) => (
+                    {filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" className="px-6 py-10 text-center text-sm text-gray-500">没有符合筛选条件的用户</td>
+                      </tr>
+                    ) : filteredUsers.map((user) => {
+                      const providerConfig = providerConfigByUserId.get(user.id);
+                      const usedInvite = usedInviteByUserId.get(user.id);
+                      return (
                       <tr key={user.id} className={user.is_active ? 'hover:bg-gray-50' : 'bg-red-50/40 hover:bg-red-50'}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{user.username || '未绑定账号'}</div>
-                          <div className="text-xs text-gray-500">ID #{user.id}</div>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
+                          {user.id}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{user.username || '未绑定账号'}</div>
+                          <div className="text-xs text-gray-500">{user.nickname || '无昵称'}</div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                               user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'
                             }`}>
                               {user.is_active ? '正常' : '已封禁'}
                             </span>
-                            <button
-                              onClick={() => handleToggleUserStatus(user)}
-                              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                                user.is_active
-                                  ? 'bg-red-50 hover:bg-red-100 text-red-700'
-                                  : 'bg-green-50 hover:bg-green-100 text-green-700'
-                              }`}
-                            >
-                              {user.is_active ? '封禁' : '解封'}
-                            </button>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-lg font-bold text-gray-900">{user.credit_balance ?? 0}</span>
-                          <span className="ml-1 text-xs text-gray-500">啤酒</span>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-bold text-gray-900">
+                            {user.is_unlimited ? '无限' : `${user.credit_balance ?? 0}`}
+                          </div>
+                          <div className="text-xs text-gray-500">{user.is_unlimited ? '不限次数' : '平台啤酒'}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => handleToggleUnlimited(user)}
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                              user.is_unlimited
-                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-800'
-                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                            }`}
-                          >
-                            {user.is_unlimited ? '无限啤酒' : '按啤酒'}
-                          </button>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {providerConfig ? (
+                            <div className="min-w-0">
+                              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+                                已配置
+                              </span>
+                              <div className="mt-1 max-w-[12rem] truncate text-xs text-gray-500" title={providerConfig.base_url}>
+                                {providerConfig.base_url}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                              未配置
+                            </span>
+                          )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <div>登录：{user.last_login_at ? formatChinaDateTime(user.last_login_at) : '从未登录'}</div>
-                          <div>使用：{user.last_used ? formatChinaDateTime(user.last_used) : '从未使用'}</div>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {usedInvite ? (
+                            <div className="min-w-0">
+                              <div className="max-w-[11rem] truncate font-mono text-xs text-gray-900" title={usedInvite.code}>
+                                {usedInvite.code}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {usedInvite.created_by_type === 'user'
+                                  ? `邀请人：${usedInvite.created_by_display_name || `用户 #${usedInvite.created_by_user_id}`}`
+                                  : '管理员邀请码'}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {formatChinaDateTime(user.created_at)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {user.last_login_at ? formatChinaDateTime(user.last_login_at) : '-'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => handleToggleUserStatus(user)}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                user.is_active
+                                  ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                                  : 'bg-green-50 text-green-700 hover:bg-green-100'
+                              }`}
+                            >
+                              {user.is_active ? '封禁' : '启用'}
+                            </button>
+                            <button
+                              onClick={() => handleToggleUnlimited(user)}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                user.is_unlimited
+                                  ? 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              {user.is_unlimited ? '取消无限' : '设为无限'}
+                            </button>
                             <input
                               type="number"
                               min="1"
                               value={creditTopUps[user.id] || ''}
                               onChange={(e) => setCreditTopUps((current) => ({ ...current, [user.id]: e.target.value }))}
                               placeholder="啤酒"
-                              className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                              className="h-8 w-20 rounded-lg border border-gray-300 px-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                             />
                             <button
                               onClick={() => handleAddCredits(user.id)}
-                              className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
+                              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
                             >
                               充值
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
             </div>
+            )}
 
+            {accountPanelTab === 'creditTransactions' && (
             <div className="bg-white rounded-2xl shadow-ios overflow-hidden">
               <div className="p-6 border-b border-gray-200 flex items-center gap-3">
                 <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
@@ -1602,7 +1753,9 @@ const AdminDashboard = () => {
                 </table>
               </div>
             </div>
+            )}
 
+            {accountPanelTab === 'apiConfigs' && (
             <div className="bg-white rounded-2xl shadow-ios overflow-hidden">
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">用户自带 API 配置摘要</h3>
@@ -1646,6 +1799,7 @@ const AdminDashboard = () => {
                 </table>
               </div>
             </div>
+            )}
           </div>
         )}
         

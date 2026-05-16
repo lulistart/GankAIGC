@@ -165,9 +165,11 @@ def test_admin_dashboard_hides_legacy_card_key_management():
     assert "/api/admin/audit-logs" in admin_dashboard
     assert "auditLogs" in admin_dashboard
     assert "啤酒兑换码" in admin_dashboard
-    assert "用户啤酒余额" in admin_dashboard
-    assert "按啤酒" in admin_dashboard
-    assert "无限啤酒" in admin_dashboard
+    assert "用户列表" in admin_dashboard
+    assert "平台啤酒" in admin_dashboard
+    assert "设为无限" in admin_dashboard
+    assert "取消无限" in admin_dashboard
+    assert "邀请码管理" in admin_dashboard
     assert "邀请码、兑换码和用户余额统一在这里管理。" not in admin_dashboard
     assert "前往管理" not in admin_dashboard
     assert "生成卡密" not in admin_dashboard
